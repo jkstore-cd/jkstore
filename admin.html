@@ -9,17 +9,18 @@
 @media(prefers-color-scheme:dark){:root{--bg:#17171a;--soft:#222226;--ink:#f3f3f4;--mut:#a5a5ab;--line:#333338;color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 Outfit,system-ui,sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
-.wrap{max-width:560px;margin:0 auto;padding:16px 18px 60px}
-h1{font-size:24px;margin:6px 0 14px}
-h2{font-size:20px;margin:6px 0 10px}
+.wrap{max-width:560px;margin:0 auto;padding:16px 18px 70px}
+h1{font-size:24px;margin:6px 0 12px}
+h2{font-size:18px;margin:20px 0 6px}
 .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.btn{display:block;width:100%;background:var(--red);color:#fff;border:0;border-radius:12px;padding:14px 18px;font:600 16px Outfit,sans-serif;cursor:pointer;text-align:center;text-decoration:none}
+.btn{display:block;width:100%;background:var(--red);color:#fff;border:0;border-radius:12px;padding:14px 18px;font:600 16px Outfit,sans-serif;cursor:pointer;text-align:center}
 .btn[disabled]{opacity:.5}
 .ghost{background:var(--soft);color:var(--ink);border:0;border-radius:10px;padding:9px 14px;font:500 15px Outfit,sans-serif;cursor:pointer}
+.ghost.w{width:100%;margin:6px 0}
 .danger{background:none;border:1.5px solid var(--red);color:var(--red);border-radius:12px;padding:12px;width:100%;font:600 15px Outfit,sans-serif;margin-top:10px}
 input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px;font:16px Outfit,sans-serif;background:var(--bg);color:var(--ink);margin:6px 0 12px}
 label{font-weight:600;font-size:14px}
-.item{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.item{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .item img,.item .nop{width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--soft);flex:none;display:grid;place-items:center;font-size:11px;color:var(--mut)}
 .item .t{flex:1;min-width:0}
 .item .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -28,22 +29,38 @@ label{font-weight:600;font-size:14px}
 .tag.off{background:#6b6e73;color:#fff}.tag.out{background:var(--red);color:#fff}
 .msg{margin:10px 0;padding:10px 12px;border-radius:10px;font-size:14px;background:var(--soft)}
 .msg.err{color:var(--red)}
-.prev{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:14px;background:var(--soft);margin:6px 0 10px}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 8px}
+.th{position:relative;width:84px;height:84px}
+.th img{width:100%;height:100%;object-fit:cover;border-radius:10px;background:var(--soft)}
+.th .x{position:absolute;top:-6px;right:-6px;width:26px;height:26px;border-radius:50%;border:0;background:var(--red);color:#fff;font-size:16px;line-height:1}
+.th .st{position:absolute;bottom:3px;left:3px;border:0;border-radius:8px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;padding:2px 7px}
+.th .mn{position:absolute;bottom:3px;left:3px;border-radius:8px;background:var(--red);color:#fff;font-size:11px;padding:1px 7px}
+.cb{border:1.5px solid var(--line);border-radius:14px;padding:10px 12px;margin:10px 0}
+.cr{display:flex;gap:8px;align-items:center}
+.cr input{margin:0}
+.dot{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);flex:none}
 .chk{display:flex;align-items:center;gap:10px;margin:4px 0 14px;font-weight:500}
 .chk input{width:auto;margin:0}
+.row2{display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 10px}
 [hidden]{display:none!important}
 </style></head><body>
 <div class="wrap" id="app"></div>
 <script>
 const SB={u:"https://nunhbbvfqfmwvfsauiwy.supabase.co",k:"sb_publishable_38SZCvwKGi1I4DUYXjHqIg_7muHScfZ"};
 const BUCKET="product-images";
+const CC={blanc:"#fff",noir:"#111",rouge:"#d32f2f",bleu:"#3b6fd4",marron:"#7b5a3c",violet:"#8e5bd0",rose:"#f06eb5",vert:"#1f5a3f",beige:"#d8cdb8",bordeaux:"#6e1424","rouge bordeaux":"#6e1424","bleu de nuit":"#14204a",jaune:"#f2c200",gris:"#8a8a8a","gris clair":"#bdbdbd",camel:"#c19a6b","gris foncé":"#4a4a4f",orange:"#f28a1e",lilas:"#c8b6d6","bleu ciel":"#8fb4e3","vert d'eau":"#6fbfa5","bleu gris":"#6a7a9a","bleu marine":"#1b2a4a",taupe:"#b09080",kaki:"#6b6e5c",anthracite:"#34353d","vert foncé":"#1f5a3f","crème":"#efe3cf",camouflage:"linear-gradient(135deg,#6b5b3a 0 34%,#2f3a2a 34% 67%,#c9b98a 67%)",turquoise:"#1e9bb8","bleu roi":"#2a3a9a","noir logo":"linear-gradient(180deg,#111 0 42%,#e4e4e4 42% 58%,#111 58%)"};
 const $=id=>document.getElementById(id);
 const e=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const app=$("app");
-let S=null,list=[],cur=null,note="",noteErr=false;
+let S=null,list=[],cur=null,note="",noteErr=false,view="login",q="";
 try{S=JSON.parse(localStorage.getItem("jk_admin")||"null")}catch(_){}
+if(S)view="list";
 const keepS=s=>{S=s;try{s?localStorage.setItem("jk_admin",JSON.stringify(s)):localStorage.removeItem("jk_admin")}catch(_){}};
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const dot=n=>{const p=String(n||"").toLowerCase().split("/").map(x=>CC[x.trim()]||"#999");return p.length>1?`linear-gradient(135deg,${p[0]} 50%,${p[1]} 50%)`:p[0]};
+const csz=s=>String(s||"").split(/[,;\/]/).map(v=>v.trim()).filter(Boolean);
 
+/* ---------- connexion ---------- */
 async function authCall(grant,body){
   const r=await fetch(SB.u+"/auth/v1/token?grant_type="+grant,{method:"POST",headers:{apikey:SB.k,"Content-Type":"application/json"},body:JSON.stringify(body)});
   const j=await r.json().catch(()=>({}));
@@ -60,63 +77,124 @@ async function api(path,opt={}){
   return fetch(SB.u+path,Object.assign({},opt,{headers:h}));
 }
 async function errText(r){
-  if(r.status==401||r.status==403)return "Accès refusé. Vérifie que la sécurité Supabase (le code SQL) a bien été exécutée et que tu utilises le bon e-mail.";
-  const j=await r.json().catch(()=>({}));return j.message||j.msg||("Erreur "+r.status);
+  const j=await r.json().catch(()=>({}));const m=j.message||j.msg||j.error||"";
+  if(/column|schema cache/i.test(m))return "Il manque des colonnes dans Supabase. Lance le code SQL « nouvelles colonnes » envoyé par Claude. ("+m+")";
+  if(r.status==401||r.status==403)return "Accès refusé. Vérifie que la sécurité Supabase (le code SQL) a bien été exécutée.";
+  return m||("Erreur "+r.status);
 }
-
 function go(v,m,isErr){view=v;note=m||"";noteErr=!!isErr;render()}
-let view=S?"list":"login";
 const msg=()=>note?`<div class="msg${noteErr?" err":""}">${e(note)}</div>`:"";
+function render(){if(view=="login")return renderLogin();if(view=="form")return renderForm();renderList()}
 
-function render(){
-  if(view=="login")return renderLogin();
-  if(view=="form")return renderForm();
-  renderList();
-}
 function renderLogin(){
   app.innerHTML=`<h1>JKSTORE · Admin</h1>${msg()}
   <label for="em">E-mail</label><input id="em" type="email" autocomplete="username" inputmode="email" autocapitalize="none">
   <label for="pw">Mot de passe</label><input id="pw" type="password" autocomplete="current-password">
   <button class="btn" id="go">Se connecter</button>`;
   const doLogin=async()=>{const b=$("go");b.disabled=true;b.textContent="Connexion…";
-    try{await authCall("password",{email:$("em").value.trim(),password:$("pw").value});await loadList();go("list")}
-    catch(err){b.disabled=false;b.textContent="Se connecter";note=err.message=="Invalid login credentials"?"E-mail ou mot de passe incorrect.":err.message;noteErr=true;const m=app.querySelector(".msg");if(m){m.textContent=note;m.className="msg err"}else{app.querySelector("h1").insertAdjacentHTML("afterend",`<div class="msg err">${e(note)}</div>`)}}};
+    try{await authCall("password",{email:$("em").value.trim(),password:$("pw").value});go("list")}
+    catch(err){b.disabled=false;b.textContent="Se connecter";const t=err.message=="Invalid login credentials"?"E-mail ou mot de passe incorrect.":err.message;let m=app.querySelector(".msg");if(!m){app.querySelector("h1").insertAdjacentHTML("afterend",'<div class="msg err"></div>');m=app.querySelector(".msg")}m.className="msg err";m.textContent=t}};
   $("go").onclick=doLogin;$("pw").onkeydown=ev=>{if(ev.key=="Enter")doLogin()};
 }
+
+/* ---------- liste ---------- */
 async function loadList(){
   const r=await api("/rest/v1/products?select=*&order=id.desc");
   if(!r.ok)throw new Error(await errText(r));
   list=await r.json();
 }
+function listHtml(){
+  const w=q.trim().toLowerCase(),a=list.filter(p=>!w||(p.Name+" "+(p.Category||"")).toLowerCase().includes(w));
+  if(!list.length)return '<p class="mut">Aucun produit pour l’instant. Appuie sur « Ajouter un produit », ou importe ton ancien catalogue (en bas de page).</p>';
+  if(!a.length)return '<p class="mut">Aucun résultat.</p>';
+  return a.map(p=>{const nc=Array.isArray(p.colors)?p.colors.length:0;
+  return `<div class="item" data-id="${p.id}">${p.image_url?`<img src="${e(p.image_url)}" alt="" loading="lazy">`:`<div class="nop">Photo</div>`}
+  <div class="t"><b>${e(p.Name)}</b><span class="mut">${e(p.Category||"—")} · ${e(p.Price)} $${nc?" · "+nc+" couleur"+(nc>1?"s":""):""}</span><br>${p.is_active?"":'<span class="tag off">Masqué</span>'}${(p.Stock||0)<=0?'<span class="tag out">Épuisé</span>':'<span class="tag">Stock '+e(p.Stock)+'</span>'}${p.badge?`<span class="tag">${e(p.badge)}</span>`:""}</div><span class="mut">›</span></div>`}).join("");
+}
 async function renderList(){
   app.innerHTML=`<div class="top"><h1>Mes produits</h1><button class="ghost" id="lo">Déconnexion</button></div>${msg()}
-  <button class="btn" id="new">+ Ajouter un produit</button><div id="ls"><p class="mut">Chargement…</p></div>
-  <p class="mut" style="margin-top:18px">Connecté : ${e(S&&S.email)}</p>`;
+  <button class="btn" id="new">+ Ajouter un produit</button>
+  <input id="sq" type="search" placeholder="Rechercher un produit…" value="${e(q)}" style="margin-top:12px">
+  <div id="ls"><p class="mut">Chargement…</p></div>
+  <h2>Outils</h2><a class="ghost w" style="display:block;text-align:center;text-decoration:none" href="index.html" target="_blank">Voir le site ›</a>
+  <button class="ghost w" id="imp">Importer l’ancien catalogue du site</button><div class="msg" id="impm" hidden></div>
+  <p class="mut" style="margin-top:14px">Connecté : ${e(S&&S.email)}</p>`;
   $("lo").onclick=()=>{keepS(null);list=[];go("login")};
-  $("new").onclick=()=>{cur={isNew:true,Name:"",Category:"",Price:"",Description:"",image_url:"",Stock:10,is_active:true};go("form")};
+  $("new").onclick=()=>{cur=blank();go("form")};
+  $("imp").onclick=importOld;
+  $("sq").oninput=ev=>{q=ev.target.value;$("ls").innerHTML=listHtml()};
   try{await loadList()}catch(err){$("ls").innerHTML=`<div class="msg err">${e(err.message)}</div>`;return}
-  $("ls").innerHTML=list.length?list.map(p=>`<div class="item" data-id="${p.id}" style="cursor:pointer">${p.image_url?`<img src="${e(p.image_url)}" alt="">`:`<div class="nop">Photo</div>`}
-  <div class="t"><b>${e(p.Name)}</b><span class="mut">${e(p.Category||"—")} · ${e(p.Price)} $</span><br>${p.is_active?"":'<span class="tag off">Masqué</span>'}${(p.Stock||0)<=0?'<span class="tag out">Épuisé</span>':'<span class="tag">Stock '+e(p.Stock)+'</span>'}</div><span class="mut">Modifier ›</span></div>`).join(""):'<p class="mut">Aucun produit pour l’instant. Appuie sur « Ajouter un produit ».</p>';
-  $("ls").onclick=ev=>{const it=ev.target.closest(".item");if(!it)return;cur=Object.assign({},list.find(x=>x.id==it.dataset.id));go("form")};
+  $("ls").innerHTML=listHtml();
+  $("ls").onclick=ev=>{const it=ev.target.closest(".item");if(!it)return;cur=fromRow(list.find(x=>x.id==it.dataset.id));go("form")};
 }
+
+/* ---------- formulaire ---------- */
+const blank=()=>({isNew:true,Name:"",Category:"",Price:"",Description:"",Stock:10,is_active:true,badge:"",sizes:"",sizes_out:"",images:[],colors:[]});
+function fromRow(r){
+  const imgs=Array.isArray(r.images)?r.images.filter(Boolean):[];
+  if(!imgs.length&&r.image_url)imgs.push(r.image_url);
+  return{id:r.id,Name:r.Name||"",Category:r.Category||"",Price:r.Price==null?"":r.Price,Description:r.Description||"",Stock:r.Stock==null?0:r.Stock,is_active:r.is_active!==false,badge:r.badge||"",sizes:r.sizes||"",sizes_out:r.sizes_out||"",images:imgs,
+    colors:(Array.isArray(r.colors)?r.colors:[]).map(c=>({name:c.name||"",images:Array.isArray(c.images)?c.images.filter(Boolean):[]}))};
+}
+function sync(){
+  if(view!="form"||!$("fn"))return;
+  const g=id=>$(id).value;
+  Object.assign(cur,{Name:g("fn"),Category:g("fc"),Price:g("fp"),Stock:g("fs"),Description:g("fd"),sizes:g("fz"),sizes_out:g("fo"),badge:g("fb"),is_active:$("fa").checked});
+  document.querySelectorAll("[data-cn]").forEach(i=>{cur.colors[+i.dataset.cn].name=i.value});
+}
+const thumbs=(arr,ci)=>arr.map((u,i)=>`<div class="th"><img src="${e(u)}" alt=""><button class="x" data-a="${ci==null?"rmi":"rmci"}" data-ci="${ci==null?"":ci}" data-i="${i}" aria-label="Retirer">×</button>${ci==null?(i?`<button class="st" data-a="main" data-i="${i}">★ Principale</button>`:'<span class="mn">Principale</span>'):""}</div>`).join("");
 function renderForm(){
   const p=cur,cats=[...new Set(list.map(x=>x.Category).filter(Boolean))];
   app.innerHTML=`<div class="top"><h1>${p.isNew?"Nouveau produit":"Modifier"}</h1><button class="ghost" id="bk">‹ Retour</button></div>${msg()}
-  <label>Photo</label>${p.image_url?`<img class="prev" id="pv" src="${e(p.image_url)}" alt="">`:`<div class="prev" id="pv" style="display:grid;place-items:center;color:var(--mut)">Pas encore de photo</div>`}
-  <input id="fi" type="file" accept="image/*">
+  <h2>Photos</h2><div class="mut">La première photo est celle de la vignette.</div>
+  <div class="thumbs">${thumbs(p.images)}</div><input id="fi" type="file" accept="image/*" multiple>
   <label for="fn">Nom</label><input id="fn" value="${e(p.Name)}" placeholder="Ex : Maillot Bayern domicile">
-  <label for="fc">Catégorie</label><input id="fc" list="cats" value="${e(p.Category)}" placeholder="Maillots, Pulls, Crocs…"><datalist id="cats">${cats.map(c=>`<option value="${e(c)}">`).join("")}</datalist>
+  <label for="fc">Catégorie</label><input id="fc" list="cats" value="${e(p.Category)}" placeholder="Maillots, Chaussures, Vêtements…"><datalist id="cats">${cats.map(c=>`<option value="${e(c)}">`).join("")}</datalist>
   <label for="fp">Prix ($)</label><input id="fp" inputmode="decimal" value="${e(p.Price)}" placeholder="19.99">
   <label for="fs">Stock (0 = épuisé)</label><input id="fs" inputmode="numeric" value="${e(p.Stock)}">
   <label for="fd">Description</label><textarea id="fd" rows="3">${e(p.Description)}</textarea>
-  <label class="chk"><input type="checkbox" id="fa" ${p.is_active?"checked":""}>Visible sur le site</label>
-  <button class="btn" id="sv">Enregistrer</button>${p.isNew?"":'<button class="danger" id="dl">Supprimer ce produit</button>'}`;
-  $("bk").onclick=()=>go("list");
-  $("fi").onchange=()=>{const f=$("fi").files[0];if(f){const pv=$("pv");const img=document.createElement("img");img.className="prev";img.id="pv";img.alt="";img.src=URL.createObjectURL(f);pv.replaceWith(img)}};
+  <h2>Tailles</h2>
+  <label for="fz">Tailles proposées (séparées par des virgules)</label><input id="fz" value="${e(p.sizes)}" placeholder="Vide = automatique selon la catégorie">
+  <div class="row2"><button class="ghost" data-a="sz" data-v="S, M, L, XL, XXL">S → XXL</button><button class="ghost" data-a="sz" data-v="38, 39, 40, 41, 42, 43, 44, 45">38 → 45</button><button class="ghost" data-a="sz" data-v="Unique">Taille unique</button></div>
+  <label for="fo">Tailles épuisées</label><input id="fo" value="${e(p.sizes_out)}" placeholder="Ex : S, XXL">
+  <label for="fb">Étiquette sur la vignette</label><input id="fb" list="bds" value="${e(p.badge)}" placeholder="Nouveau, Promo… (facultatif)"><datalist id="bds"><option value="Nouveau"><option value="Promo"><option value="Dernières pièces"></datalist>
+  <h2>Couleurs</h2><div class="mut">Chaque couleur peut avoir ses propres photos. Sans photo, le client voit les photos principales.</div>
+  ${p.colors.map((c,ci)=>`<div class="cb"><div class="cr"><span class="dot" style="background:${dot(c.name)}"></span><input data-cn="${ci}" list="cl" value="${e(c.name)}" placeholder="Nom (ex : Noir, ou Noir/Blanc)"><button class="ghost" data-a="rmc" data-ci="${ci}">Retirer</button></div>
+  <div class="thumbs">${thumbs(c.images,ci)}</div><input type="file" accept="image/*" multiple data-cf="${ci}" style="margin-bottom:0"></div>`).join("")}
+  <datalist id="cl">${Object.keys(CC).map(k=>`<option value="${e(cap(k))}">`).join("")}</datalist>
+  <button class="ghost w" data-a="addc">+ Ajouter une couleur</button>
+  <label class="chk" style="margin-top:14px"><input type="checkbox" id="fa" ${p.is_active?"checked":""}>Visible sur le site</label>
+  <button class="btn" id="sv">Enregistrer</button>${p.isNew?"":'<button class="ghost w" id="dp" style="margin-top:10px">Dupliquer ce produit</button><button class="danger" id="dl">Supprimer ce produit</button>'}`;
+  $("bk").onclick=()=>{sync();go("list")};
   $("sv").onclick=saveForm;
-  if($("dl"))$("dl").onclick=async()=>{if(!confirm("Supprimer définitivement « "+p.Name+" » ?"))return;
-    const r=await api("/rest/v1/products?id=eq."+p.id,{method:"DELETE"});
+  if($("dp"))$("dp").onclick=()=>{sync();cur=Object.assign(JSON.parse(JSON.stringify(cur)),{isNew:true,id:undefined,Name:cur.Name+" (copie)"});go("form","Copie créée : modifie-la puis enregistre.")};
+  if($("dl"))$("dl").onclick=async()=>{if(!confirm("Supprimer définitivement « "+cur.Name+" » ?"))return;
+    const r=await api("/rest/v1/products?id=eq."+cur.id,{method:"DELETE"});
     if(!r.ok){go("form",await errText(r),true);return}go("list","Produit supprimé.")};
+}
+app.addEventListener("click",ev=>{
+  const t=ev.target.closest("[data-a]");if(!t||view!="form")return;
+  sync();const a=t.dataset.a,i=+t.dataset.i,ci=+t.dataset.ci;
+  if(a=="rmi")cur.images.splice(i,1);
+  else if(a=="rmci")cur.colors[ci].images.splice(i,1);
+  else if(a=="main"){const [u]=cur.images.splice(i,1);cur.images.unshift(u)}
+  else if(a=="rmc")cur.colors.splice(ci,1);
+  else if(a=="addc")cur.colors.push({name:"",images:[]});
+  else if(a=="sz"){cur.sizes=t.dataset.v}
+  else return;
+  note="";renderForm();
+});
+app.addEventListener("change",ev=>{
+  const t=ev.target;if(t.type!="file"||view!="form"||!t.files.length)return;
+  const files=[...t.files];sync();
+  const target=t.id=="fi"?cur.images:cur.colors[+t.dataset.cf].images;
+  addFiles(files,target);
+});
+async function addFiles(files,target){
+  note="Envoi des photos…";noteErr=false;renderForm();
+  try{for(const f of files){target.push(await upBlob(await shrink(f),"jpg"))}note=""}
+  catch(err){note=err.message;noteErr=true}
+  renderForm();
 }
 async function shrink(file){
   const b=await createImageBitmap(file),k=Math.min(1,1000/Math.max(b.width,b.height)),c=document.createElement("canvas");
@@ -124,30 +202,101 @@ async function shrink(file){
   const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(b,0,0,c.width,c.height);
   return new Promise(r=>c.toBlob(r,"image/jpeg",.85));
 }
+async function upBlob(blob,ext){
+  const fname=Date.now()+"-"+Math.random().toString(36).slice(2,8)+"."+(ext||"jpg");
+  const up=await api("/storage/v1/object/"+BUCKET+"/"+fname,{method:"POST",headers:{"Content-Type":blob.type||"image/jpeg"},body:blob});
+  if(!up.ok)throw new Error("Photo non envoyée. "+await errText(up));
+  return SB.u+"/storage/v1/object/public/"+BUCKET+"/"+fname;
+}
+function rowOf(p){
+  const price=parseFloat(String(p.Price).replace(",","."));const stock=parseInt(p.Stock,10);
+  const cols=p.colors.map(c=>({name:c.name.trim(),images:c.images})).filter(c=>c.name);
+  const first=p.images[0]||((cols.find(c=>c.images[0])||{images:[]}).images[0])||"";
+  return{Name:p.Name.trim(),Category:p.Category.trim()||"Autres",Price:price,Stock:isNaN(stock)?0:stock,Description:p.Description.trim(),image_url:first,is_active:p.is_active,
+    badge:p.badge.trim(),sizes:csz(p.sizes).join(", "),sizes_out:csz(p.sizes_out).join(", "),images:p.images,colors:cols};
+}
 async function saveForm(){
-  const b=$("sv"),name=$("fn").value.trim(),price=parseFloat($("fp").value.replace(",","."));
-  const showErr=m=>{let el=app.querySelector(".msg");if(!el){app.querySelector("h1").parentElement.insertAdjacentHTML("afterend",'<div class="msg err"></div>');el=app.querySelector(".msg")}el.className="msg err";el.textContent=m};
-  if(!name)return showErr("Le nom est obligatoire.");
+  sync();const b=$("sv");
+  const showErr=m=>{let el=app.querySelector(".msg");if(!el){app.querySelector(".top").insertAdjacentHTML("afterend",'<div class="msg err"></div>');el=app.querySelector(".msg")}el.className="msg err";el.textContent=m;window.scrollTo(0,0)};
+  if(!cur.Name.trim())return showErr("Le nom est obligatoire.");
+  const price=parseFloat(String(cur.Price).replace(",","."));
   if(isNaN(price)||price<0)return showErr("Le prix doit être un nombre, par exemple 19.99.");
-  const stock=parseInt($("fs").value,10);
   b.disabled=true;b.textContent="Enregistrement…";
   try{
-    let url=cur.image_url||"";
-    const f=$("fi").files[0];
-    if(f){
-      b.textContent="Envoi de la photo…";
-      const blob=await shrink(f),fname=Date.now()+"-"+Math.random().toString(36).slice(2,8)+".jpg";
-      const up=await api("/storage/v1/object/"+BUCKET+"/"+fname,{method:"POST",headers:{"Content-Type":"image/jpeg"},body:blob});
-      if(!up.ok)throw new Error("Photo non envoyée. "+await errText(up));
-      url=SB.u+"/storage/v1/object/public/"+BUCKET+"/"+fname;
-    }
-    const row={Name:name,Category:$("fc").value.trim()||"Autres",Price:price,Stock:isNaN(stock)?0:stock,Description:$("fd").value.trim(),image_url:url,is_active:$("fa").checked};
+    const row=rowOf(cur);
     const r=cur.isNew
       ?await api("/rest/v1/products",{method:"POST",headers:{"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify(row)})
       :await api("/rest/v1/products?id=eq."+cur.id,{method:"PATCH",headers:{"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify(row)});
     if(!r.ok)throw new Error(await errText(r));
     go("list","Enregistré. Le site est à jour.");
   }catch(err){b.disabled=false;b.textContent="Enregistrer";showErr(err.message)}
+}
+
+/* ---------- import de l'ancien catalogue ---------- */
+function csv(t){const r=[];let w=[],c="",qq=false;for(let i=0;i<t.length;i++){const h=t[i];
+  if(qq){if(h=='"'){if(t[i+1]=='"'){c+='"';i++}else qq=false}else c+=h}
+  else if(h=='"')qq=true;else if(h==","){w.push(c);c=""}
+  else if(h=="\n"||h=="\r"){if(h=="\r"&&t[i+1]=="\n")i++;w.push(c);c="";r.push(w);w=[]}else c+=h}
+  if(c||w.length){w.push(c);r.push(w)}return r}
+const nkey=s=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+function planImport(txt){
+  const get=n=>{const m=txt.match(new RegExp("^const "+n+"=(.*);\\s*$","m"));if(!m)throw new Error("Données « "+n+" » introuvables dans catalogue-ancien.html");return JSON.parse(m[1])};
+  const IMG=get("IMG"),IMGC=get("IMGC"),IMGS=get("IMGS"),IMGZ=get("IMGZ"),DEMO=get("DEMO");
+  const rows=csv(DEMO).filter(x=>x.some(v=>v.trim())),h=rows.shift().map(nkey),out=[];
+  rows.forEach(x=>{const o={};h.forEach((k,j)=>o[k]=(x[j]||"").trim());if(!o.nom)return;
+    const n=o.nom,z=IMGZ[n],shoe=nkey(o.type||"").startsWith("chauss");
+    const plain=src=>({k:src,src});
+    const gal=[];
+    if(IMGS[n])IMGS[n].forEach(s=>gal.push(plain(s)));
+    else{if(IMG[n])gal.push(plain(IMG[n]));if(z&&z.src&&z.src!==IMG[n])gal.push(plain(z.src))}
+    const cols=(o.couleurs||"").split(/[,;]/).map(v=>v.trim()).filter(Boolean).map(c=>{
+      let imgs=[];const v=(IMGC[n]||{})[c];
+      if(v)imgs=[].concat(v).map(plain);
+      else if(z&&z.b&&z.b[c])imgs=[{k:"crop|"+n+"|"+c,src:z.src,crop:z.b[c]}];
+      return{name:c,imgs}});
+    out.push({n,row:{Name:n,Category:o.categorie||"Autres",Price:parseFloat((o.prix||"0").replace(",","."))||0,Stock:10,Description:o.description||"",
+      is_active:nkey(o.disponible||"oui")!="non",badge:o.badge||"",sizes:o.tailles?o.tailles.split(/[,;\/]/).map(v=>v.trim()).filter(Boolean).join(", "):(shoe?"38, 39, 40, 41, 42, 43, 44, 45":"S, M, L, XL, XXL"),
+      sizes_out:(o.tailles_indisponibles||"").split(/[,;\/]/).map(v=>v.trim()).filter(Boolean).join(", ")},gal,cols});
+  });
+  return out;
+}
+const loadImg=src=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error("Image illisible"));i.src=src});
+async function cropBlob(src,bb){
+  const img=await loadImg(src),W=img.naturalWidth,H=img.naturalHeight;
+  const x=bb[0]*W,y=bb[1]*H,w=(bb[2]-bb[0])*W,hh=(bb[3]-bb[1])*H,side=Math.max(w,hh)/.9,k=Math.min(1,1000/side);
+  const c=document.createElement("canvas");c.width=c.height=Math.max(1,Math.round(side*k));
+  const g=c.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,c.width,c.height);
+  g.drawImage(img,x,y,w,hh,(side-w)/2*k,(side-hh)/2*k,w*k,hh*k);
+  return new Promise(r=>c.toBlob(r,"image/jpeg",.85));
+}
+async function importOld(){
+  const box=$("impm"),btn=$("imp");box.hidden=false;box.className="msg";
+  const say=t=>{box.textContent=t};
+  if(list.length&&!confirm("Ta liste contient déjà des produits. Les produits qui ont le même nom seront ignorés. Continuer ?"))return;
+  btn.disabled=true;
+  try{
+    say("Lecture de l’ancien catalogue…");
+    const r=await fetch("catalogue-ancien.html?t="+Date.now());
+    if(!r.ok)throw new Error("Le fichier catalogue-ancien.html est introuvable sur ton site. Envoie-le sur GitHub puis réessaie.");
+    const plan=planImport(await r.text()),have=new Set(list.map(p=>p.Name)),cache=new Map();
+    const todo=plan.filter(p=>!have.has(p.n)).reverse();
+    if(!todo.length){say("Rien à importer : tous les produits existent déjà.");btn.disabled=false;return}
+    const up=async d=>{if(cache.has(d.k))return cache.get(d.k);
+      const blob=d.crop?await cropBlob(d.src,d.crop):await (await fetch(d.src)).blob();
+      const url=await upBlob(blob,(blob.type.split("/")[1]||"jpg").replace("jpeg","jpg"));cache.set(d.k,url);return url};
+    let i=0;
+    for(const p of todo){i++;say("Produit "+i+"/"+todo.length+" : "+p.n+" (photos en cours…)");
+      const images=[];for(const d of p.gal)images.push(await up(d));
+      const colors=[];for(const c of p.cols){const im=[];for(const d of c.imgs)im.push(await up(d));colors.push({name:c.name,images:im})}
+      const first=images[0]||((colors.find(c=>c.images[0])||{images:[]}).images[0])||"";
+      const row=Object.assign({},p.row,{image_url:first,images,colors});
+      const ins=await api("/rest/v1/products",{method:"POST",headers:{"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify(row)});
+      if(!ins.ok)throw new Error("« "+p.n+" » : "+await errText(ins));
+    }
+    await loadList();$("ls").innerHTML=listHtml();
+    say("Import terminé : "+todo.length+" produits ajoutés avec leurs photos et couleurs.");
+  }catch(err){box.className="msg err";say(err.message+" Tu peux relancer l’import : les produits déjà importés seront ignorés.")}
+  btn.disabled=false;
 }
 render();
 </script></body></html>
