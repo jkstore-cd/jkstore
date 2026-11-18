@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>JKSTORE · Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap">
+<style>
+:root{--red:#FD1E23;--bg:#fff;--soft:#f6f4f4;--ink:#1d1d1f;--mut:#6b6b70;--line:#ececee;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#17171a;--soft:#222226;--ink:#f3f3f4;--mut:#a5a5ab;--line:#333338;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 Outfit,system-ui,sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.wrap{max-width:560px;margin:0 auto;padding:16px 18px 60px}
+h1{font-size:24px;margin:6px 0 14px}
+h2{font-size:20px;margin:6px 0 10px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.btn{display:block;width:100%;background:var(--red);color:#fff;border:0;border-radius:12px;padding:14px 18px;font:600 16px Outfit,sans-serif;cursor:pointer;text-align:center;text-decoration:none}
+.btn[disabled]{opacity:.5}
+.ghost{background:var(--soft);color:var(--ink);border:0;border-radius:10px;padding:9px 14px;font:500 15px Outfit,sans-serif;cursor:pointer}
+.danger{background:none;border:1.5px solid var(--red);color:var(--red);border-radius:12px;padding:12px;width:100%;font:600 15px Outfit,sans-serif;margin-top:10px}
+input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px;font:16px Outfit,sans-serif;background:var(--bg);color:var(--ink);margin:6px 0 12px}
+label{font-weight:600;font-size:14px}
+.item{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.item img,.item .nop{width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--soft);flex:none;display:grid;place-items:center;font-size:11px;color:var(--mut)}
+.item .t{flex:1;min-width:0}
+.item .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mut{color:var(--mut);font-size:13px}
+.tag{display:inline-block;border-radius:99px;padding:1px 9px;font-size:12px;background:var(--soft);margin-right:4px}
+.tag.off{background:#6b6e73;color:#fff}.tag.out{background:var(--red);color:#fff}
+.msg{margin:10px 0;padding:10px 12px;border-radius:10px;font-size:14px;background:var(--soft)}
+.msg.err{color:var(--red)}
+.prev{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:14px;background:var(--soft);margin:6px 0 10px}
+.chk{display:flex;align-items:center;gap:10px;margin:4px 0 14px;font-weight:500}
+.chk input{width:auto;margin:0}
+[hidden]{display:none!important}
+</style></head><body>
+<div class="wrap" id="app"></div>
+<script>
+const SB={u:"https://nunhbbvfqfmwvfsauiwy.supabase.co",k:"sb_publishable_38SZCvwKGi1I4DUYXjHqIg_7muHScfZ"};
+const BUCKET="product-images";
+const $=id=>document.getElementById(id);
+const e=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const app=$("app");
+let S=null,list=[],cur=null,note="",noteErr=false;
+try{S=JSON.parse(localStorage.getItem("jk_admin")||"null")}catch(_){}
+const keepS=s=>{S=s;try{s?localStorage.setItem("jk_admin",JSON.stringify(s)):localStorage.removeItem("jk_admin")}catch(_){}};
+
+async function authCall(grant,body){
+  const r=await fetch(SB.u+"/auth/v1/token?grant_type="+grant,{method:"POST",headers:{apikey:SB.k,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.error_description||j.msg||j.message||"Connexion impossible");
+  keepS({at:j.access_token,rt:j.refresh_token,email:(j.user&&j.user.email)||(S&&S.email)||""});
+}
+const jwtExp=t=>{try{return JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))).exp*1000}catch(_){return 0}};
+async function api(path,opt={}){
+  if(!S)throw new Error("Non connecté");
+  if(jwtExp(S.at)<Date.now()+60000){
+    try{await authCall("refresh_token",{refresh_token:S.rt})}catch(err){keepS(null);go("login","Session expirée, reconnecte-toi.",true);throw err}
+  }
+  const h=Object.assign({apikey:SB.k,Authorization:"Bearer "+S.at},opt.headers||{});
+  return fetch(SB.u+path,Object.assign({},opt,{headers:h}));
+}
+async function errText(r){
+  if(r.status==401||r.status==403)return "Accès refusé. Vérifie que la sécurité Supabase (le code SQL) a bien été exécutée et que tu utilises le bon e-mail.";
+  const j=await r.json().catch(()=>({}));return j.message||j.msg||("Erreur "+r.status);
+}
+
+function go(v,m,isErr){view=v;note=m||"";noteErr=!!isErr;render()}
+let view=S?"list":"login";
+const msg=()=>note?`<div class="msg${noteErr?" err":""}">${e(note)}</div>`:"";
+
+function render(){
+  if(view=="login")return renderLogin();
+  if(view=="form")return renderForm();
+  renderList();
+}
+function renderLogin(){
+  app.innerHTML=`<h1>JKSTORE · Admin</h1>${msg()}
+  <label for="em">E-mail</label><input id="em" type="email" autocomplete="username" inputmode="email" autocapitalize="none">
+  <label for="pw">Mot de passe</label><input id="pw" type="password" autocomplete="current-password">
+  <button class="btn" id="go">Se connecter</button>`;
+  const doLogin=async()=>{const b=$("go");b.disabled=true;b.textContent="Connexion…";
+    try{await authCall("password",{email:$("em").value.trim(),password:$("pw").value});await loadList();go("list")}
+    catch(err){b.disabled=false;b.textContent="Se connecter";note=err.message=="Invalid login credentials"?"E-mail ou mot de passe incorrect.":err.message;noteErr=true;const m=app.querySelector(".msg");if(m){m.textContent=note;m.className="msg err"}else{app.querySelector("h1").insertAdjacentHTML("afterend",`<div class="msg err">${e(note)}</div>`)}}};
+  $("go").onclick=doLogin;$("pw").onkeydown=ev=>{if(ev.key=="Enter")doLogin()};
+}
+async function loadList(){
+  const r=await api("/rest/v1/products?select=*&order=id.desc");
+  if(!r.ok)throw new Error(await errText(r));
+  list=await r.json();
+}
+async function renderList(){
+  app.innerHTML=`<div class="top"><h1>Mes produits</h1><button class="ghost" id="lo">Déconnexion</button></div>${msg()}
+  <button class="btn" id="new">+ Ajouter un produit</button><div id="ls"><p class="mut">Chargement…</p></div>
+  <p class="mut" style="margin-top:18px">Connecté : ${e(S&&S.email)}</p>`;
+  $("lo").onclick=()=>{keepS(null);list=[];go("login")};
+  $("new").onclick=()=>{cur={isNew:true,Name:"",Category:"",Price:"",Description:"",image_url:"",Stock:10,is_active:true};go("form")};
+  try{await loadList()}catch(err){$("ls").innerHTML=`<div class="msg err">${e(err.message)}</div>`;return}
+  $("ls").innerHTML=list.length?list.map(p=>`<div class="item" data-id="${p.id}" style="cursor:pointer">${p.image_url?`<img src="${e(p.image_url)}" alt="">`:`<div class="nop">Photo</div>`}
+  <div class="t"><b>${e(p.Name)}</b><span class="mut">${e(p.Category||"—")} · ${e(p.Price)} $</span><br>${p.is_active?"":'<span class="tag off">Masqué</span>'}${(p.Stock||0)<=0?'<span class="tag out">Épuisé</span>':'<span class="tag">Stock '+e(p.Stock)+'</span>'}</div><span class="mut">Modifier ›</span></div>`).join(""):'<p class="mut">Aucun produit pour l’instant. Appuie sur « Ajouter un produit ».</p>';
+  $("ls").onclick=ev=>{const it=ev.target.closest(".item");if(!it)return;cur=Object.assign({},list.find(x=>x.id==it.dataset.id));go("form")};
+}
+function renderForm(){
+  const p=cur,cats=[...new Set(list.map(x=>x.Category).filter(Boolean))];
+  app.innerHTML=`<div class="top"><h1>${p.isNew?"Nouveau produit":"Modifier"}</h1><button class="ghost" id="bk">‹ Retour</button></div>${msg()}
+  <label>Photo</label>${p.image_url?`<img class="prev" id="pv" src="${e(p.image_url)}" alt="">`:`<div class="prev" id="pv" style="display:grid;place-items:center;color:var(--mut)">Pas encore de photo</div>`}
+  <input id="fi" type="file" accept="image/*">
+  <label for="fn">Nom</label><input id="fn" value="${e(p.Name)}" placeholder="Ex : Maillot Bayern domicile">
+  <label for="fc">Catégorie</label><input id="fc" list="cats" value="${e(p.Category)}" placeholder="Maillots, Pulls, Crocs…"><datalist id="cats">${cats.map(c=>`<option value="${e(c)}">`).join("")}</datalist>
+  <label for="fp">Prix ($)</label><input id="fp" inputmode="decimal" value="${e(p.Price)}" placeholder="19.99">
+  <label for="fs">Stock (0 = épuisé)</label><input id="fs" inputmode="numeric" value="${e(p.Stock)}">
+  <label for="fd">Description</label><textarea id="fd" rows="3">${e(p.Description)}</textarea>
+  <label class="chk"><input type="checkbox" id="fa" ${p.is_active?"checked":""}>Visible sur le site</label>
+  <button class="btn" id="sv">Enregistrer</button>${p.isNew?"":'<button class="danger" id="dl">Supprimer ce produit</button>'}`;
+  $("bk").onclick=()=>go("list");
+  $("fi").onchange=()=>{const f=$("fi").files[0];if(f){const pv=$("pv");const img=document.createElement("img");img.className="prev";img.id="pv";img.alt="";img.src=URL.createObjectURL(f);pv.replaceWith(img)}};
+  $("sv").onclick=saveForm;
+  if($("dl"))$("dl").onclick=async()=>{if(!confirm("Supprimer définitivement « "+p.Name+" » ?"))return;
+    const r=await api("/rest/v1/products?id=eq."+p.id,{method:"DELETE"});
+    if(!r.ok){go("form",await errText(r),true);return}go("list","Produit supprimé.")};
+}
+async function shrink(file){
+  const b=await createImageBitmap(file),k=Math.min(1,1000/Math.max(b.width,b.height)),c=document.createElement("canvas");
+  c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);
+  const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(b,0,0,c.width,c.height);
+  return new Promise(r=>c.toBlob(r,"image/jpeg",.85));
+}
+async function saveForm(){
+  const b=$("sv"),name=$("fn").value.trim(),price=parseFloat($("fp").value.replace(",","."));
+  const showErr=m=>{let el=app.querySelector(".msg");if(!el){app.querySelector("h1").parentElement.insertAdjacentHTML("afterend",'<div class="msg err"></div>');el=app.querySelector(".msg")}el.className="msg err";el.textContent=m};
+  if(!name)return showErr("Le nom est obligatoire.");
+  if(isNaN(price)||price<0)return showErr("Le prix doit être un nombre, par exemple 19.99.");
+  const stock=parseInt($("fs").value,10);
+  b.disabled=true;b.textContent="Enregistrement…";
+  try{
+    let url=cur.image_url||"";
+    const f=$("fi").files[0];
+    if(f){
+      b.textContent="Envoi de la photo…";
+      const blob=await shrink(f),fname=Date.now()+"-"+Math.random().toString(36).slice(2,8)+".jpg";
+      const up=await api("/storage/v1/object/"+BUCKET+"/"+fname,{method:"POST",headers:{"Content-Type":"image/jpeg"},body:blob});
+      if(!up.ok)throw new Error("Photo non envoyée. "+await errText(up));
+      url=SB.u+"/storage/v1/object/public/"+BUCKET+"/"+fname;
+    }
+    const row={Name:name,Category:$("fc").value.trim()||"Autres",Price:price,Stock:isNaN(stock)?0:stock,Description:$("fd").value.trim(),image_url:url,is_active:$("fa").checked};
+    const r=cur.isNew
+      ?await api("/rest/v1/products",{method:"POST",headers:{"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify(row)})
+      :await api("/rest/v1/products?id=eq."+cur.id,{method:"PATCH",headers:{"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify(row)});
+    if(!r.ok)throw new Error(await errText(r));
+    go("list","Enregistré. Le site est à jour.");
+  }catch(err){b.disabled=false;b.textContent="Enregistrer";showErr(err.message)}
+}
+render();
+</script></body></html>

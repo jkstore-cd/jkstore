@@ -179,8 +179,13 @@ $("sheet").addEventListener("scroll",ev=>{const c=ev.target;if(c.classList&&c.cl
 $("shade").onclick=hide;$("open").onclick=checkout;
 $("chips").onclick=ev=>{const c=ev.target.dataset.c;if(c){cat=c;chips();grid()}};
 $("grid").onclick=ev=>{const b=ev.target.closest(".card");if(b)product(+b.dataset.id)};
+const SB={u:"https://nunhbbvfqfmwvfsauiwy.supabase.co",k:"sb_publishable_38SZCvwKGi1I4DUYXjHqIg_7muHScfZ"};
+async function sbLoad(){const r=await fetch(SB.u+"/rest/v1/products?select=*&is_active=eq.true&order=id.desc",{headers:{apikey:SB.k}});if(!r.ok)return[];const a=await r.json();
+return a.filter(x=>x.Name).map(x=>{const sh=/chauss|basket|crocs|sneaker|air force|puma|asics/i.test(x.Category||""),s=sh?["38","39","40","41","42","43","44","45"]:["S","M","L","XL","XXL"],st=x.Stock==null?1:+x.Stock;
+return{id:1e5+x.id,n:x.Name,c:x.Category||"Autres",p:parseFloat(x.Price)||0,d:x.Description||"",img:x.image_url||"",s,col:[],bd:"",ind:st<=0?s.slice():[],ok:true}})}
 async function load(){try{const t=CFG.sheet?await(await fetch(CFG.sheet+(CFG.sheet.includes("?")?"&":"?")+"t="+Date.now())).text():DEMO;P=parse(t)}
 catch(err){$("grid").innerHTML='<p class="note">Le catalogue ne se charge pas. Écris-nous sur WhatsApp pour commander.</p>';return}
+try{P=await sbLoad().then(a=>a.concat(P))}catch(_){}
 fill();loadCart();chips();grid();$("wa").href=`https://wa.me/${CFG.wa}?text=`+encodeURIComponent("Bonjour JKSTORE, j’ai une question.");$("wa2").href=$("wa").href;const mh=location.hash.match(/^#p=(.+)$/);if(mh){const pp=P.find(x=>x.n==decodeURIComponent(mh[1]));if(pp)product(pp.id)}}
 load();
 </script>
