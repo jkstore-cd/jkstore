@@ -66,6 +66,10 @@ label{font-weight:600;font-size:14px}
 .tp{margin:8px 0}
 .tp .bar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden;margin-top:3px}
 .tp .bar i{display:block;height:100%;background:var(--red)}
+.grip{flex:none;width:34px;align-self:stretch;display:grid;place-items:center;color:var(--mut);font-size:22px;touch-action:none;-webkit-user-select:none;user-select:none;cursor:grab}
+.item.drag{background:var(--soft);box-shadow:0 6px 18px rgba(0,0,0,.22);position:relative;z-index:5;border-radius:12px}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(20,20,22,.94);color:#fff;border-radius:99px;padding:10px 18px;font:500 14px Outfit,sans-serif;z-index:50;max-width:90%;text-align:center}
+#toast.err{background:#b3080c}
 [hidden]{display:none!important}
 </style></head><body>
 <div class="wrap" id="app"></div>
@@ -155,8 +159,8 @@ function downloadCsv(name,rows){
 async function exportProducts(btn){
   btn.disabled=true;const t=btn.textContent;btn.textContent="Préparation…";
   try{const r=await api("/rest/v1/products?select=*&order=id.asc");if(!r.ok)throw new Error(await errText(r));const a=await r.json();
-    const rows=[["id","Name","Category","Price","old_price","Stock","is_active","badge","sizes","sizes_out","Description","image_url","images","colors_json","created_at"]];
-    a.forEach(p=>rows.push([p.id,p.Name,p.Category,p.Price,p.old_price,p.Stock,p.is_active,p.badge,p.sizes,p.sizes_out,p.Description,p.image_url,(p.images||[]).join(" | "),JSON.stringify(p.colors||[]),p.created_at]));
+    const rows=[["id","Name","Category","Price","old_price","Stock","is_active","badge","sizes","sizes_out","Description","image_url","images","colors_json","created_at","sort_order"]];
+    a.forEach(p=>rows.push([p.id,p.Name,p.Category,p.Price,p.old_price,p.Stock,p.is_active,p.badge,p.sizes,p.sizes_out,p.Description,p.image_url,(p.images||[]).join(" | "),JSON.stringify(p.colors||[]),p.created_at,p.sort_order]));
     downloadCsv("jkstore-produits-"+today()+".csv",rows);btn.textContent="Fichier prêt ✓"}
   catch(err){btn.textContent=t;alert(err.message)}
   btn.disabled=false;setTimeout(()=>{btn.textContent=t},2500);
@@ -174,35 +178,102 @@ async function exportOrders(btn){
 
 /* ---------- onglet Produits ---------- */
 async function loadList(){
-  const r=await api("/rest/v1/products?select=*&order=id.desc");
+  let r=await api("/rest/v1/products?select=*&order=sort_order.asc,id.desc");
+  if(!r.ok)r=await api("/rest/v1/products?select=*&order=id.desc");
   if(!r.ok)throw new Error(await errText(r));
   list=await r.json();
+}
+let toastT=0;
+function toast(m,bad){let t=$("toast");if(!t){t=document.createElement("div");t.id="toast";document.body.appendChild(t)}t.className=bad?"err":"";t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},bad?4500:2200)}
+async function saveOrder(ids){
+  const r=await api("/rest/v1/rpc/admin_reorder_products",{method:"POST",headers:JH,body:JSON.stringify({p_ids:ids})});
+  if(!r.ok){toast(await errText(r),true);return false}
+  const pos=new Map(ids.map((id,i)=>[id,i+1]));list.forEach(p=>{if(pos.has(p.id))p.sort_order=pos.get(p.id)});
+  toast("Ordre enregistré ✓");return true;
+}
+let suppressClick=0;
+function initDrag(){
+  const ls=$("ls");
+  ls.onpointerdown=ev=>{
+    const g=ev.target.closest(".grip");if(!g)return;
+    ev.preventDefault();
+    const items=[...ls.querySelectorAll(".item")],it=g.closest(".item"),i0=items.indexOf(it);if(i0<0)return;
+    const rects=items.map(x=>{const r=x.getBoundingClientRect();return{top:r.top+scrollY,h:r.height}});
+    const h0=rects[i0].h,startY=ev.clientY+scrollY;let cy=ev.clientY,target=i0,raf=0;
+    try{g.setPointerCapture(ev.pointerId)}catch(_){}
+    it.classList.add("drag");items.forEach(x=>{if(x!==it)x.style.transition="transform .15s"});
+    const frame=()=>{
+      const vh=innerHeight;if(cy<90)scrollBy(0,-14);else if(cy>vh-90)scrollBy(0,14);
+      const dy=cy+scrollY-startY;it.style.transform="translateY("+dy+"px)";
+      const mid=rects[i0].top+h0/2+dy;let t=0;
+      items.forEach((x,k)=>{if(k!==i0&&rects[k].top+rects[k].h/2<mid)t++});
+      target=t;
+      items.forEach((x,k)=>{if(k===i0)return;let sh=0;if(k<i0&&k>=target)sh=h0;else if(k>i0&&k-1<target)sh=-h0;x.style.transform=sh?"translateY("+sh+"px)":""});
+      raf=requestAnimationFrame(frame);
+    };
+    raf=requestAnimationFrame(frame);
+    const mv=e=>{cy=e.clientY};
+    const end=async()=>{
+      cancelAnimationFrame(raf);g.removeEventListener("pointermove",mv);g.removeEventListener("pointerup",end);g.removeEventListener("pointercancel",end);
+      suppressClick=Date.now();
+      const order=items.filter(x=>x!==it);order.splice(target,0,it);
+      items.forEach(x=>{x.style.transform="";x.style.transition=""});it.classList.remove("drag");
+      order.forEach(x=>ls.appendChild(x));
+      if(target===i0)return;
+      const ids=order.map(x=>+x.dataset.id),byId=new Map(list.map(p=>[p.id,p]));
+      list=ids.map(i=>byId.get(i)).filter(Boolean);
+      await saveOrder(ids);
+    };
+    g.addEventListener("pointermove",mv);g.addEventListener("pointerup",end);g.addEventListener("pointercancel",end);
+  };
+}
+function vividScore(url){return new Promise(res=>{if(!url)return res(null);const im=new Image();im.crossOrigin="anonymous";
+  im.onload=()=>{try{const c=document.createElement("canvas");c.width=c.height=64;const g=c.getContext("2d");g.drawImage(im,0,0,64,64);const d=g.getImageData(0,0,64,64).data;let tot=0;
+    for(let i=0;i<d.length;i+=4){const mx=Math.max(d[i],d[i+1],d[i+2]),mn=Math.min(d[i],d[i+1],d[i+2]),v=mx/255,sa=mx?(mx-mn)/mx:0;if(v>0.15&&sa>0.25)tot+=sa*(0.5+0.5*v)}
+    res(tot/4096)}catch(_){res(null)}};
+  im.onerror=()=>res(null);im.src=url})}
+async function autoVivid(btn){
+  if(!confirm("Réorganiser toute la liste : les articles aux couleurs les plus vives passent devant. Tu pourras ensuite ajuster en glissant. Continuer ?"))return;
+  const t=btn.textContent;btn.disabled=true;
+  try{
+    const sc=[];for(let i=0;i<list.length;i++){btn.textContent="Analyse des photos "+(i+1)+"/"+list.length+"…";sc.push(await vividScore(list[i].image_url))}
+    if(!sc.some(x=>x!=null))throw new Error("Impossible d’analyser les photos depuis ce navigateur. Utilise le glisser-déposer.");
+    const idx=list.map((_,i)=>i).sort((a,b)=>((sc[b]==null?-1:sc[b])-(sc[a]==null?-1:sc[a]))||a-b);
+    const ids=idx.map(i=>list[i].id);
+    if(await saveOrder(ids)){await loadList();$("ls").innerHTML=listHtml()}
+  }catch(err){alert(err.message)}
+  btn.textContent=t;btn.disabled=false;
 }
 function listHtml(){
   const w=q.trim().toLowerCase(),a=list.filter(p=>!w||(p.Name+" "+(p.Category||"")).toLowerCase().includes(w));
   if(!list.length)return '<p class="mut">Aucun produit pour l’instant. Appuie sur « Ajouter un produit ».</p>';
   if(!a.length)return '<p class="mut">Aucun résultat.</p>';
+  const grip=!w?'<div class="grip" aria-label="Déplacer">≡</div>':"";
   return a.map(p=>{const nc=Array.isArray(p.colors)?p.colors.length:0,op=+p.old_price||0,pr=+p.Price||0;
-  return `<div class="item" data-id="${p.id}">${p.image_url?`<img src="${e(p.image_url)}" alt="" loading="lazy">`:`<div class="nop">Photo</div>`}
+  return `<div class="item" data-id="${p.id}">${grip}${p.image_url?`<img src="${e(p.image_url)}" alt="" loading="lazy">`:`<div class="nop">Photo</div>`}
   <div class="t"><b>${e(p.Name)}</b><span class="mut">${e(p.Category||"—")} · ${e(p.Price)} $${nc?" · "+nc+" couleur"+(nc>1?"s":""):""}</span><br>${p.is_active?"":'<span class="tag off">Masqué</span>'}${(p.Stock||0)<=0?'<span class="tag out">Épuisé</span>':'<span class="tag">Stock '+e(p.Stock)+'</span>'}${op>pr?`<span class="tag promo">Promo −${Math.round((1-pr/op)*100)}%</span>`:""}${p.badge?`<span class="tag">${e(p.badge)}</span>`:""}</div><span class="mut">›</span></div>`}).join("");
 }
 async function paneProducts(){
   $("pane").innerHTML=`<button class="btn" id="new">+ Ajouter un produit</button>
   <input id="sq" type="search" placeholder="Rechercher un produit…" value="${e(q)}" style="margin-top:12px">
+  <p class="mut" id="dh" style="margin:0 0 4px"></p>
   <div id="ls"><p class="mut">Chargement…</p></div>
   <h2>Outils</h2><a class="ghost w" href="index.html" target="_blank">Voir le site ›</a>
+  <button class="ghost w" id="viv">Trier par couleurs vives (automatique)</button>
   <button class="ghost w" id="exp">Exporter les produits (CSV)</button>
   <p class="mut" style="margin-top:14px">Connecté : ${e(S&&S.email)}</p>`;
   $("new").onclick=()=>{cur=blank();go("form")};
   $("exp").onclick=ev=>exportProducts(ev.target);
-  $("sq").oninput=ev=>{q=ev.target.value;$("ls").innerHTML=listHtml()};
+  $("viv").onclick=ev=>autoVivid(ev.target);
+  const dh=()=>{$("dh").textContent=q.trim()?"Efface la recherche pour pouvoir déplacer les produits.":"Glisse ≡ pour changer l’ordre : le premier produit apparaît en premier sur le site."};
+  $("sq").oninput=ev=>{q=ev.target.value;$("ls").innerHTML=listHtml();dh()};dh();
   try{await loadList()}catch(err){$("ls").innerHTML=`<div class="msg err">${e(err.message)}</div>`;return}
-  $("ls").innerHTML=listHtml();
-  $("ls").onclick=ev=>{const it=ev.target.closest(".item");if(!it)return;cur=fromRow(list.find(x=>x.id==it.dataset.id));go("form")};
+  $("ls").innerHTML=listHtml();initDrag();
+  $("ls").onclick=ev=>{if(ev.target.closest(".grip")||Date.now()-suppressClick<400)return;const it=ev.target.closest(".item");if(!it)return;cur=fromRow(list.find(x=>x.id==it.dataset.id));go("form")};
 }
 
 /* ---------- formulaire produit ---------- */
-const blank=()=>({isNew:true,Name:"",Category:"",Price:"",old_price:"",Description:"",Stock:10,is_active:true,badge:"",sizes:"",sizes_out:"",images:[],colors:[]});
+const blank=()=>({isNew:true,Name:"",Category:"",Price:"",old_price:"",Description:"",Stock:10,is_active:true,badge:"",sizes:"",sizes_out:"",images:[],colors:[],pin:false});
 function fromRow(r){
   const imgs=Array.isArray(r.images)?r.images.filter(Boolean):[];
   if(!imgs.length&&r.image_url)imgs.push(r.image_url);
@@ -212,7 +283,7 @@ function fromRow(r){
 function sync(){
   if(view!="form"||!$("fn"))return;
   const g=id=>$(id).value;
-  Object.assign(cur,{Name:g("fn"),Category:g("fc"),Price:g("fp"),old_price:g("fop"),Stock:g("fs"),Description:g("fd"),sizes:g("fz"),sizes_out:g("fo"),badge:g("fb"),is_active:$("fa").checked});
+  Object.assign(cur,{pin:$("fpin")?$("fpin").checked:false,Name:g("fn"),Category:g("fc"),Price:g("fp"),old_price:g("fop"),Stock:g("fs"),Description:g("fd"),sizes:g("fz"),sizes_out:g("fo"),badge:g("fb"),is_active:$("fa").checked});
   document.querySelectorAll("[data-cn]").forEach(i=>{cur.colors[+i.dataset.cn].name=i.value});
 }
 const thumbs=(arr,ci)=>arr.map((u,i)=>`<div class="th"><img src="${e(u)}" alt=""><button class="x" data-a="${ci==null?"rmi":"rmci"}" data-ci="${ci==null?"":ci}" data-i="${i}" aria-label="Retirer">×</button>${ci==null?(i?`<button class="st" data-a="main" data-i="${i}">★ Principale</button>`:'<span class="mn">Principale</span>'):""}</div>`).join("");
@@ -239,6 +310,7 @@ function renderForm(){
   <datalist id="cl">${Object.keys(CC).map(k=>`<option value="${e(cap(k))}">`).join("")}</datalist>
   <button class="ghost w" data-a="addc">+ Ajouter une couleur</button>
   <label class="chk" style="margin-top:14px"><input type="checkbox" id="fa" ${p.is_active?"checked":""}>Visible sur le site</label>
+  ${p.isNew?"":`<label class="chk"><input type="checkbox" id="fpin" ${p.pin?"checked":""}>Mettre en tête de la boutique</label>`}
   <button class="btn" id="sv">Enregistrer</button>${p.isNew?"":'<button class="ghost w" id="dp" style="margin-top:10px">Dupliquer ce produit</button><button class="danger" id="dl">Supprimer ce produit</button>'}`;
   $("bk").onclick=()=>{sync();tab="products";go("main")};
   $("sv").onclick=saveForm;
@@ -289,7 +361,8 @@ function rowOf(p){
   const cols=p.colors.map(c=>({name:c.name.trim(),images:c.images})).filter(c=>c.name);
   const first=p.images[0]||((cols.find(c=>c.images[0])||{images:[]}).images[0])||"";
   return{Name:p.Name.trim(),Category:p.Category.trim()||"Autres",Price:price,old_price:(!isNaN(op)&&op>price)?op:null,Stock:isNaN(stock)?0:stock,Description:p.Description.trim(),image_url:first,is_active:p.is_active,
-    badge:p.badge.trim(),sizes:csz(p.sizes).join(", "),sizes_out:csz(p.sizes_out).join(", "),images:p.images,colors:cols};
+    badge:p.badge.trim(),sizes:csz(p.sizes).join(", "),sizes_out:csz(p.sizes_out).join(", "),images:p.images,colors:cols,
+    ...((p.isNew||p.pin)?{sort_order:Math.min(0,...list.map(x=>+x.sort_order||0))-1}:{})};
 }
 async function saveForm(){
   sync();const b=$("sv");
