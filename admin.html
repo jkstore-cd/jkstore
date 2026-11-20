@@ -176,6 +176,44 @@ async function exportOrders(btn){
   btn.disabled=false;setTimeout(()=>{btn.textContent=t},2500);
 }
 
+const DEF_IG="https://www.instagram.com/jkstore.cd",DEF_TK="https://www.tiktok.com/@jkstore.cd";
+const DEF_TERMS=`## Livraison
+Nous livrons à Kinshasa en {delay}. Frais de livraison : {fee}. Le délai commence quand ta commande est confirmée avec toi sur WhatsApp.
+
+## Paiement
+À la livraison, ou par Airtel Money / M-Pesa. Avec un paiement mobile, la commande est confirmée après vérification du paiement.
+
+## Échanges et problèmes
+Si un article ne convient pas ou présente un défaut, écris-nous sur WhatsApp dès la réception. Nous cherchons ensemble une solution (échange selon la disponibilité).
+
+## Tes données
+Pour traiter ta commande, nous enregistrons ton nom, ton téléphone, ton adresse de livraison et le contenu de ta commande. Ces informations servent uniquement à préparer et livrer ta commande et à te contacter. Nous ne les vendons pas. Pour les faire effacer, écris-nous sur WhatsApp.
+
+## Visites
+Le site compte les visites de façon anonyme (sans nom ni numéro) pour savoir quels articles intéressent.`;
+const prodLink=(id,src)=>new URL("produit.html?id="+id+(src?"&src="+src:""),location.href).href;
+async function copyText(t){try{await navigator.clipboard.writeText(t)}catch(_){prompt("Copie ce lien :",t)}}
+function draftDesc(p){
+  const sh=/chauss|basket|crocs|sneaker|air force|puma|asics/i.test(p.Category||"");
+  let s=csz(p.sizes);if(!s.length)s=sh?["38","39","40","41","42","43","44","45"]:["S","M","L","XL","XXL"];
+  const j=s.join(","),t=(s.length===1&&/^unique$/i.test(s[0]))?"Taille unique.":j==="S,M,L,XL,XXL"?"Tailles : S à XXL.":j==="38,39,40,41,42,43,44,45"?"Pointures : 38 à 45.":(/^\d+$/.test(s[0])?"Pointures : ":"Tailles : ")+s.join(", ")+".";
+  const cols=(Array.isArray(p.colors)?p.colors:[]).map(c=>c.name).filter(Boolean);
+  let d=p.Name+". "+t;if(cols.length)d+=" Couleurs : "+cols.join(", ")+".";
+  if(/^maillot/i.test(p.Category||"")||/^maillot/i.test(p.Name||""))d+=" Flocage personnalisé possible (nom et numéro).";
+  return d;
+}
+async function fillDescs(btn){
+  const todo=list.filter(p=>!(p.Description||"").trim());
+  if(!todo.length){toast("Toutes les descriptions sont déjà remplies");return}
+  if(!confirm(todo.length+" produit(s) n’ont pas de description. Ajouter un texte de départ (nom, tailles, couleurs) ? Tu pourras le modifier ensuite."))return;
+  const t=btn.textContent;btn.disabled=true;
+  try{let i=0;for(const p of todo){btn.textContent="Écriture "+(++i)+"/"+todo.length+"…";const d=draftDesc(p);
+      const r=await api("/rest/v1/products?id=eq."+p.id,{method:"PATCH",headers:{...JH,Prefer:"return=minimal"},body:JSON.stringify({Description:d})});
+      if(!r.ok)throw new Error(await errText(r));p.Description=d}
+    toast(todo.length+" description"+(todo.length>1?"s":"")+" ajoutée"+(todo.length>1?"s":""))}
+  catch(err){alert(err.message)}
+  btn.textContent=t;btn.disabled=false;
+}
 /* ---------- onglet Produits ---------- */
 async function loadList(){
   let r=await api("/rest/v1/products?select=*&order=sort_order.asc,id.desc");
@@ -260,11 +298,13 @@ async function paneProducts(){
   <div id="ls"><p class="mut">Chargement…</p></div>
   <h2>Outils</h2><a class="ghost w" href="index.html" target="_blank">Voir le site ›</a>
   <button class="ghost w" id="viv">Trier par couleurs vives (automatique)</button>
+  <button class="ghost w" id="fdesc">Remplir les descriptions vides (brouillon)</button>
   <button class="ghost w" id="exp">Exporter les produits (CSV)</button>
   <p class="mut" style="margin-top:14px">Connecté : ${e(S&&S.email)}</p>`;
   $("new").onclick=()=>{cur=blank();go("form")};
   $("exp").onclick=ev=>exportProducts(ev.target);
   $("viv").onclick=ev=>autoVivid(ev.target);
+  $("fdesc").onclick=ev=>fillDescs(ev.target);
   const dh=()=>{$("dh").textContent=q.trim()?"Efface la recherche pour pouvoir déplacer les produits.":"Glisse ≡ pour changer l’ordre : le premier produit apparaît en premier sur le site."};
   $("sq").oninput=ev=>{q=ev.target.value;$("ls").innerHTML=listHtml();dh()};dh();
   try{await loadList()}catch(err){$("ls").innerHTML=`<div class="msg err">${e(err.message)}</div>`;return}
@@ -311,6 +351,7 @@ function renderForm(){
   <button class="ghost w" data-a="addc">+ Ajouter une couleur</button>
   <label class="chk" style="margin-top:14px"><input type="checkbox" id="fa" ${p.is_active?"checked":""}>Visible sur le site</label>
   ${p.isNew?"":`<label class="chk"><input type="checkbox" id="fpin" ${p.pin?"checked":""}>Mettre en tête de la boutique</label>`}
+  ${p.isNew?"":`<h2>Lien à partager</h2><div class="mut">Ce lien ouvre une page propre du produit, avec son prix.</div><div class="row2" style="margin-top:8px"><button class="ghost" data-lk="">Copier le lien</button><button class="ghost" data-lk="tiktok">TikTok</button><button class="ghost" data-lk="instagram">Instagram</button><button class="ghost" data-lk="whatsapp">WhatsApp</button></div><a class="ghost w" href="${e(prodLink(p.id,""))}" target="_blank" rel="noopener">Voir la page du produit ›</a>`}
   <button class="btn" id="sv">Enregistrer</button>${p.isNew?"":'<button class="ghost w" id="dp" style="margin-top:10px">Dupliquer ce produit</button><button class="danger" id="dl">Supprimer ce produit</button>'}`;
   $("bk").onclick=()=>{sync();tab="products";go("main")};
   $("sv").onclick=saveForm;
@@ -319,7 +360,9 @@ function renderForm(){
     const r=await api("/rest/v1/products?id=eq."+cur.id,{method:"DELETE"});
     if(!r.ok){go("form",await errText(r),true);return}tab="products";go("main","Produit supprimé.",false,true)};
 }
-app.addEventListener("click",ev=>{
+app.addEventListener("click",async ev=>{
+  const lk=ev.target.closest("[data-lk]");
+  if(lk&&view=="form"&&cur&&!cur.isNew){await copyText(prodLink(cur.id,lk.dataset.lk));toast("Lien copié ✓");return}
   const t=ev.target.closest("[data-a]");if(!t||view!="form")return;
   sync();const a=t.dataset.a,i=+t.dataset.i,ci=+t.dataset.ci;
   if(a=="rmi")cur.images.splice(i,1);
@@ -429,6 +472,7 @@ async function paneOrders(){
 }
 
 /* ---------- onglet Statistiques ---------- */
+const SRCN={direct:"Direct ou inconnu",tiktok:"TikTok",instagram:"Instagram",whatsapp:"WhatsApp",partage:"Lien partagé par un client",facebook:"Facebook",google:"Google"};
 async function paneStats(){
   $("pane").innerHTML=`<div class="chips">${[7,30,90].map(d=>`<button class="chip${sdays==d?" on":""}" data-d="${d}">${d} jours</button>`).join("")}</div><div id="sb"><p class="mut">Chargement…</p></div>`;
   $("pane").querySelector(".chips").onclick=ev=>{const d=+ev.target.dataset.d;if(d){sdays=d;paneStats()}};
@@ -443,12 +487,18 @@ async function paneStats(){
     <div class="card"><b>${s.carts}</b><span class="mut">Ajouts au panier</span></div>
     <div class="card"><b>${s.orders}</b><span class="mut">Commandes</span></div>
     <div class="card"><b>${money(s.revenue)}</b><span class="mut">Ventes (articles)</span></div></div>
+    <h2>D’où viennent les visites</h2>
+    ${(s.sources||[]).length?(s.sources||[]).map(x=>`<div class="tp"><div style="display:flex;justify-content:space-between;gap:8px"><b>${e(SRCN[x.src]||x.src)}</b><span class="mut">${x.visits} visites · ${x.orders} commande${x.orders>1?"s":""}</span></div><div class="bar"><i style="width:${Math.round(x.visits/Math.max(1,...(s.sources||[]).map(y=>y.visits))*100)}%"></i></div></div>`).join(""):'<p class="mut">Pas encore de données. Utilise les liens de l’onglet Réglages dans tes bios.</p>'}
     <h2>Visites par jour</h2>
     <div class="bars">${days.map(d=>`<i title="${e(d.d)} : ${d.visits}" style="height:${Math.max(2,Math.round(d.visits/mx*100))}%"></i>`).join("")}</div>
     <div class="mut" style="display:flex;justify-content:space-between"><span>${e(days.length?days[0].d:"")}</span><span>max ${mx}/jour</span><span>${e(days.length?days[days.length-1].d:"")}</span></div>
     <h2>Produits les plus consultés</h2>
     ${top.length?top.map(t=>`<div class="tp"><div style="display:flex;justify-content:space-between;gap:8px"><b style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e(t.name)}</b><span class="mut" style="flex:none">${t.views} vues · ${t.carts} panier</span></div><div class="bar"><i style="width:${Math.round(t.views/tmx*100)}%"></i></div></div>`).join(""):'<p class="mut">Pas encore de données. Les statistiques se remplissent quand des clients visitent le site.</p>'}
+    <button class="ghost w" id="purge" style="margin-top:14px">Supprimer les statistiques de plus de 90 jours</button>
     <p class="mut" style="margin-top:14px">Tes propres visites ne sont pas comptées sur cet appareil (réglable dans Réglages). Les visites d’un même téléphone sont comptées une fois par session.</p>`;
+    $("purge").onclick=async()=>{if(!confirm("Supprimer les statistiques de plus de 90 jours ? Les commandes ne sont pas touchées."))return;
+      const r2=await api("/rest/v1/rpc/admin_purge_events",{method:"POST",headers:JH,body:JSON.stringify({p_days:90})});
+      if(!r2.ok){alert(await errText(r2));return}const n=await r2.json();toast(n+" ligne"+(n>1?"s":"")+" supprimée"+(n>1?"s":""))};
   }catch(err){$("sb").innerHTML=`<div class="msg err">${e(err.message)}</div>`}
 }
 
@@ -472,10 +522,22 @@ async function paneSettings(){
   <h2>Paiement</h2>
   <label for="s_pa">Numéro Airtel Money</label><input id="s_pa" value="${e(o.pay_airtel)}">
   <label for="s_pm">Numéro M-Pesa</label><input id="s_pm" value="${e(o.pay_mpesa)}">
+  <h2>Réseaux sociaux</h2>
+  <label for="s_ig">Lien Instagram (vide = masqué)</label><input id="s_ig" value="${e(o.instagram==null?DEF_IG:o.instagram)}">
+  <label for="s_tk">Lien TikTok (vide = masqué)</label><input id="s_tk" value="${e(o.tiktok==null?DEF_TK:o.tiktok)}">
+  <h2>Conditions et confidentialité</h2>
+  <div class="mut">Texte affiché en bas du site. Les titres commencent par ##. Tu peux écrire {fee} et {delay} : ils sont remplacés par les vrais frais et délai de livraison.</div>
+  <textarea id="s_tm" rows="14" style="margin-top:8px">${e(o.terms||DEF_TERMS)}</textarea>
+  <button class="ghost w" id="s_tr">Remettre le texte par défaut</button>
+  <h2>Mes liens à copier</h2>
+  <div class="mut">À mettre dans tes bios et tes messages. L’onglet Stats montre combien de visites et de commandes vient de chaque lien.</div>
+  ${[["TikTok","tiktok"],["Instagram","instagram"],["WhatsApp","whatsapp"]].map(([l,k])=>{const u=new URL("./?src="+k,location.href).href;return `<label>${l}</label><div class="cr" style="margin:4px 0 10px"><input readonly value="${e(u)}" style="margin:0"><button class="ghost" data-cp="${e(u)}">Copier</button></div>`}).join("")}
   <h2>Cet appareil</h2>
   <label class="chk"><input type="checkbox" id="s_nt" ${nt?"checked":""}>Ne pas compter mes visites dans les statistiques</label>
   <button class="btn" id="s_sv">Enregistrer les réglages</button>
   <p class="mut" style="margin-top:12px">Les changements sont visibles sur le site dès le prochain chargement de la page.</p>`;
+  $("pane").querySelectorAll("[data-cp]").forEach(b=>b.onclick=async()=>{await copyText(b.dataset.cp);toast("Lien copié ✓")});
+  $("s_tr").onclick=()=>{$("s_tm").value=DEF_TERMS};
   $("s_nt").onchange=ev=>{try{if(ev.target.checked){localStorage.setItem("jk_notrack","1");localStorage.removeItem("jk_notrack_off")}else{localStorage.removeItem("jk_notrack");localStorage.setItem("jk_notrack_off","1")}}catch(_){}};
   $("s_sv").onclick=async()=>{
     const say=(m,bad)=>{const el=$("sm");el.innerHTML=`<div class="msg${bad?" err":" ok"}">${e(m)}</div>`;window.scrollTo(0,0)};
@@ -484,8 +546,10 @@ async function paneSettings(){
     if(isNaN(fee)||fee<0)return say("Les frais de livraison doivent être un nombre (en FC).",true);
     if(isNaN(fl)||fl<0||isNaN(fl2)||fl2<0)return say("Les prix de flocage doivent être des nombres (par exemple 4.99).",true);
     if(!$("s_delay").value.trim())return say("Indique un délai de livraison.",true);
+    const ig=$("s_ig").value.trim(),tk=$("s_tk").value.trim(),tm=$("s_tm").value.trim();
+    if((ig&&!/^https?:\/\//i.test(ig))||(tk&&!/^https?:\/\//i.test(tk)))return say("Les liens Instagram et TikTok doivent commencer par https://",true);
     const b=$("s_sv");b.disabled=true;b.textContent="Enregistrement…";
-    const rows=[{key:"wa",value:wa},{key:"fee",value:String(fee)},{key:"delay",value:$("s_delay").value.trim()},{key:"fl",value:String(fl)},{key:"fl2",value:String(fl2)},{key:"pay_airtel",value:$("s_pa").value.trim()},{key:"pay_mpesa",value:$("s_pm").value.trim()},{key:"banner",value:$("s_bn").value.trim()}];
+    const rows=[{key:"instagram",value:ig},{key:"tiktok",value:tk},{key:"terms",value:tm===DEF_TERMS.trim()?"":tm},{key:"wa",value:wa},{key:"fee",value:String(fee)},{key:"delay",value:$("s_delay").value.trim()},{key:"fl",value:String(fl)},{key:"fl2",value:String(fl2)},{key:"pay_airtel",value:$("s_pa").value.trim()},{key:"pay_mpesa",value:$("s_pm").value.trim()},{key:"banner",value:$("s_bn").value.trim()}];
     try{const r=await api("/rest/v1/settings?on_conflict=key",{method:"POST",headers:{...JH,Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(rows)});
       if(!r.ok)throw new Error(await errText(r));say("Réglages enregistrés. Le site est à jour.")}
     catch(err){say(err.message,true)}
