@@ -21,7 +21,7 @@ h2{font-size:18px;margin:20px 0 6px}
 input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px;font:16px Outfit,sans-serif;background:var(--bg);color:var(--ink);margin:6px 0 12px}
 label{font-weight:600;font-size:14px}
 .tabs{display:flex;gap:6px;overflow-x:auto;margin:4px 0 12px;scrollbar-width:none}
-.tab{flex:1;white-space:nowrap;border:0;background:var(--soft);color:var(--ink);border-radius:10px;padding:10px 8px;font:600 14px Outfit,sans-serif;cursor:pointer}
+.tab{flex:1;white-space:nowrap;border:0;background:var(--soft);color:var(--ink);border-radius:10px;padding:10px 6px;font:600 13px Outfit,sans-serif;cursor:pointer}
 .tab.on{background:var(--red);color:#fff}
 .nb{display:inline-block;background:var(--red);color:#fff;border-radius:99px;padding:0 7px;font-size:12px;margin-left:3px}
 .tab.on .nb{background:#fff;color:var(--red)}
@@ -70,6 +70,17 @@ label{font-weight:600;font-size:14px}
 .item.drag{background:var(--soft);box-shadow:0 6px 18px rgba(0,0,0,.22);position:relative;z-index:5;border-radius:12px}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(20,20,22,.94);color:#fff;border-radius:99px;padding:10px 18px;font:500 14px Outfit,sans-serif;z-index:50;max-width:90%;text-align:center}
 #toast.err{background:#b3080c}
+.recap{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 12px}
+.recap div{background:var(--soft);border-radius:14px;padding:10px 12px}.recap b{display:block;font-size:19px;line-height:1.2}.recap span{font-size:12px;color:var(--mut)}
+.alertb{background:#fff1d6;color:#8a5a00;border-radius:12px;padding:10px 14px;margin:0 0 10px;font-weight:600;font-size:14px;cursor:pointer}
+@media(prefers-color-scheme:dark){.alertb{background:#4a3a10;color:#ffd78a}}
+.srow{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.srow.chg{background:rgba(253,30,35,.07)}
+.srow img,.srow .nop{width:48px;height:48px;border-radius:10px;object-fit:cover;background:var(--soft);flex:none;display:grid;place-items:center;font-size:10px;color:var(--mut)}
+.srow .t{flex:1;min-width:0}.srow .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}
+.stp{display:flex;align-items:center;gap:6px;flex:none}
+.stp button{width:36px;height:36px;border-radius:10px;border:0;background:var(--soft);color:var(--ink);font:600 20px Outfit,sans-serif;cursor:pointer}
+.stp input{width:58px;margin:0;text-align:center;padding:8px 4px}
 [hidden]{display:none!important}
 </style></head><body>
 <div class="wrap" id="app"></div>
@@ -92,6 +103,9 @@ const fcf=n=>String(Math.round(+n||0)).replace(/\B(?=(\d{3})+(?!\d))/g," ")+" FC
 const dfmt=v=>{try{return new Date(v).toLocaleString("fr-FR",{timeZone:"Africa/Kinshasa",dateStyle:"short",timeStyle:"short"})}catch(_){return v}};
 const today=()=>new Date().toISOString().slice(0,10);
 
+let LOW=3,lowLoaded=false,stockCount=0,pf="all",pcat="",sedits=new Map(),sf="all";
+const badge=n=>n?` <span class="nb">${n}</span>`:"";
+const stockState=p=>{const v=+p.Stock||0;return v<=0?"out":v<=LOW?"low":"ok"};
 /* ---------- connexion ---------- */
 async function authCall(grant,body){
   const r=await fetch(SB.u+"/auth/v1/token?grant_type="+grant,{method:"POST",headers:{apikey:SB.k,"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -134,19 +148,26 @@ function renderLogin(){
 }
 
 /* ---------- coque avec onglets ---------- */
-const TITLES={products:"Mes produits",orders:"Commandes",stats:"Statistiques",settings:"Réglages"};
+const TITLES={products:"Mes produits",orders:"Commandes",stocks:"Stocks",stats:"Statistiques",settings:"Réglages"};
 function renderShell(){
-  const tabs=[["products","Produits"],["orders","Commandes"+(newCount?` <span class="nb">${newCount}</span>`:"")],["stats","Stats"],["settings","Réglages"]];
+  const tabs=[["products","Produits"],["orders","Commandes"+badge(newCount)],["stocks","Stocks"+badge(stockCount)],["stats","Stats"],["settings","Réglages"]];
   app.innerHTML=`<div class="top"><h1>${TITLES[tab]}</h1><button class="ghost" id="lo">Déconnexion</button></div>
-  <div class="tabs">${tabs.map(([k,l])=>`<button class="tab${tab==k?" on":""}" data-t="${k}">${l}</button>`).join("")}</div>${msg()}<div id="pane"></div>`;
+  <div class="tabs">${tabs.map(([k,l])=>`<button class="tab${tab==k?" on":""}" data-t="${k}">${l}</button>`).join("")}</div>${msg()}<div id="recap"></div><div id="pane"></div>`;
   $("lo").onclick=logout;
   app.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{tab=b.dataset.t;go("main")});
-  ({products:paneProducts,orders:paneOrders,stats:paneStats,settings:paneSettings})[tab]();
+  ({products:paneProducts,orders:paneOrders,stocks:paneStocks,stats:paneStats,settings:paneSettings})[tab]();
+  if(tab=="products"||tab=="orders")loadRecap();
   refreshBadge();
 }
+const setTabBadge=(k,l,n)=>{const t=app.querySelector('.tab[data-t="'+k+'"]');if(t)t.innerHTML=l+badge(n)};
 async function refreshBadge(){
-  try{const r=await api("/rest/v1/orders?select=id&status=eq.nouvelle");if(!r.ok)return;const n=(await r.json()).length;
-    if(n!=newCount){newCount=n;const t=app.querySelector('.tab[data-t="orders"]');if(t)t.innerHTML="Commandes"+(n?` <span class="nb">${n}</span>`:"")}}catch(_){}
+  if(!lowLoaded){lowLoaded=true;try{const r=await api("/rest/v1/settings?select=value&key=eq.low_stock");if(r.ok){const x=await r.json();if(x[0]&&+x[0].value>0)LOW=+x[0].value}}catch(_){}}
+  try{const r=await api("/rest/v1/orders?select=id&status=eq.nouvelle");if(r.ok){const n=(await r.json()).length;if(n!=newCount){newCount=n;setTabBadge("orders","Commandes",n)}}}catch(_){}
+  try{const r=await api("/rest/v1/products?select=id,Stock,is_active");if(r.ok){const c=(await r.json()).filter(x=>x.is_active&&(+x.Stock||0)<=LOW).length;if(c!=stockCount){stockCount=c;setTabBadge("stocks","Stocks",c)}}}catch(_){}
+}
+async function loadRecap(){
+  try{const r=await api("/rest/v1/rpc/admin_stats",{method:"POST",headers:JH,body:JSON.stringify({p_days:1})});if(!r.ok)return;const x=await r.json();const b=$("recap");if(!b)return;
+    b.innerHTML=`<div class="recap"><div><b>${x.orders}</b><span>commande${x.orders>1?"s":""} aujourd’hui</span></div><div><b>${money(x.revenue)}</b><span>ventes (articles)</span></div><div><b>${x.visits}</b><span>visite${x.visits>1?"s":""}</span></div></div>`}catch(_){}
 }
 
 /* ---------- CSV ---------- */
@@ -283,17 +304,18 @@ async function autoVivid(btn){
   btn.textContent=t;btn.disabled=false;
 }
 function listHtml(){
-  const w=q.trim().toLowerCase(),a=list.filter(p=>!w||(p.Name+" "+(p.Category||"")).toLowerCase().includes(w));
+  const w=q.trim().toLowerCase(),a=list.filter(p=>(!w||(p.Name+" "+(p.Category||"")).toLowerCase().includes(w))&&(!pcat||p.Category===pcat)&&(pf=="all"||(pf=="hidden"?!p.is_active:(p.is_active&&stockState(p)==pf))));
   if(!list.length)return '<p class="mut">Aucun produit pour l’instant. Appuie sur « Ajouter un produit ».</p>';
   if(!a.length)return '<p class="mut">Aucun résultat.</p>';
-  const grip=!w?'<div class="grip" aria-label="Déplacer">≡</div>':"";
+  const grip=(!w&&pf=="all"&&!pcat)?'<div class="grip" aria-label="Déplacer">≡</div>':"";
   return a.map(p=>{const nc=Array.isArray(p.colors)?p.colors.length:0,op=+p.old_price||0,pr=+p.Price||0;
   return `<div class="item" data-id="${p.id}">${grip}${p.image_url?`<img src="${e(p.image_url)}" alt="" loading="lazy">`:`<div class="nop">Photo</div>`}
   <div class="t"><b>${e(p.Name)}</b><span class="mut">${e(p.Category||"—")} · ${e(p.Price)} $${nc?" · "+nc+" couleur"+(nc>1?"s":""):""}</span><br>${p.is_active?"":'<span class="tag off">Masqué</span>'}${(p.Stock||0)<=0?'<span class="tag out">Épuisé</span>':'<span class="tag">Stock '+e(p.Stock)+'</span>'}${op>pr?`<span class="tag promo">Promo −${Math.round((1-pr/op)*100)}%</span>`:""}${p.badge?`<span class="tag">${e(p.badge)}</span>`:""}</div><span class="mut">›</span></div>`}).join("");
 }
 async function paneProducts(){
-  $("pane").innerHTML=`<button class="btn" id="new">+ Ajouter un produit</button>
+  $("pane").innerHTML=`<div id="al"></div><button class="btn" id="new">+ Ajouter un produit</button>
   <input id="sq" type="search" placeholder="Rechercher un produit…" value="${e(q)}" style="margin-top:12px">
+  <div class="chips" id="pf" style="margin:0 0 6px"></div><select id="pcat"><option value="">Toutes les catégories</option></select>
   <p class="mut" id="dh" style="margin:0 0 4px"></p>
   <div id="ls"><p class="mut">Chargement…</p></div>
   <h2>Outils</h2><a class="ghost w" href="index.html" target="_blank">Voir le site ›</a>
@@ -305,9 +327,19 @@ async function paneProducts(){
   $("exp").onclick=ev=>exportProducts(ev.target);
   $("viv").onclick=ev=>autoVivid(ev.target);
   $("fdesc").onclick=ev=>fillDescs(ev.target);
-  const dh=()=>{$("dh").textContent=q.trim()?"Efface la recherche pour pouvoir déplacer les produits.":"Glisse ≡ pour changer l’ordre : le premier produit apparaît en premier sur le site."};
-  $("sq").oninput=ev=>{q=ev.target.value;$("ls").innerHTML=listHtml();dh()};dh();
+  const dh=()=>{$("dh").textContent=(q.trim()||pf!="all"||pcat)?"Efface la recherche et les filtres pour pouvoir déplacer les produits.":"Glisse ≡ pour changer l’ordre : le premier produit apparaît en premier sur le site."};
+  const drawF=()=>{$("pf").innerHTML=[["all","Tous"],["low","Stock bas"],["out","Épuisés"],["hidden","Masqués"]].map(([k,l])=>`<button class="chip${pf==k?" on":""}" data-f="${k}">${l}</button>`).join("")};
+  const redraw=()=>{drawF();$("ls").innerHTML=listHtml();dh()};
+  $("sq").oninput=ev=>{q=ev.target.value;redraw()};
+  $("pf").onclick=ev=>{const f=ev.target.dataset.f;if(f){pf=f;redraw()}};
+  $("pcat").onchange=ev=>{pcat=ev.target.value;redraw()};
+  drawF();dh();
   try{await loadList()}catch(err){$("ls").innerHTML=`<div class="msg err">${e(err.message)}</div>`;return}
+  const cats=[...new Set(list.map(x=>x.Category).filter(Boolean))];
+  $("pcat").innerHTML='<option value="">Toutes les catégories</option>'+cats.map(c=>`<option value="${e(c)}"${c===pcat?" selected":""}>${e(c)}</option>`).join("");
+  const lowN=list.filter(x=>x.is_active&&stockState(x)=="low").length,outN=list.filter(x=>x.is_active&&stockState(x)=="out").length;
+  if(lowN||outN)$("al").innerHTML=`<div class="alertb" id="alb">⚠️ ${lowN?lowN+" produit"+(lowN>1?"s":"")+" presque épuisé"+(lowN>1?"s":""):""}${lowN&&outN?" · ":""}${outN?outN+" épuisé"+(outN>1?"s":""):""} — Voir les stocks ›</div>`;
+  if($("alb"))$("alb").onclick=()=>{tab="stocks";go("main")};
   $("ls").innerHTML=listHtml();initDrag();
   $("ls").onclick=ev=>{if(ev.target.closest(".grip")||Date.now()-suppressClick<400)return;const it=ev.target.closest(".item");if(!it)return;cur=fromRow(list.find(x=>x.id==it.dataset.id));go("form")};
 }
@@ -472,6 +504,40 @@ async function paneOrders(){
 }
 
 /* ---------- onglet Statistiques ---------- */
+async function paneStocks(){
+  $("pane").innerHTML=`<div class="mut" style="margin-bottom:6px">Change les chiffres, puis appuie sur « Enregistrer les stocks ». L’alerte se déclenche à ${LOW} article${LOW>1?"s":""} ou moins (réglable dans Réglages).</div><div class="chips" id="sf"></div><div id="sl"><p class="mut">Chargement…</p></div><button class="btn" id="ssv" style="position:sticky;bottom:calc(12px + env(safe-area-inset-bottom,0px));margin-top:12px" disabled>Enregistrer les stocks</button>`;
+  try{await loadList()}catch(err){$("sl").innerHTML=`<div class="msg err">${e(err.message)}</div>`;return}
+  const val=p=>sedits.has(p.id)?sedits.get(p.id):(+p.Stock||0);
+  const stt=v=>v<=0?"out":v<=LOW?"low":"ok";
+  const tagH=v=>stt(v)=="out"?'<span class="tag out">Épuisé</span>':stt(v)=="low"?'<span class="tag" style="background:#fff1d6;color:#8a5a00">Bas</span>':"";
+  const draw=()=>{
+    const act=list.filter(p=>p.is_active),cnt={all:list.length,low:act.filter(p=>stt(val(p))=="low").length,out:act.filter(p=>stt(val(p))=="out").length};
+    $("sf").innerHTML=[["all","Tous"],["low","Stock bas"],["out","Épuisés"]].map(([k,l])=>`<button class="chip${sf==k?" on":""}" data-f="${k}">${l} (${cnt[k]})</button>`).join("");
+    const rows=list.filter(p=>sf=="all"||(p.is_active&&stt(val(p))==sf));
+    $("sl").innerHTML=rows.length?rows.map(p=>{const v=val(p),ch=sedits.has(p.id)&&v!==(+p.Stock||0);
+      return `<div class="srow${ch?" chg":""}" data-id="${p.id}">${p.image_url?`<img src="${e(p.image_url)}" alt="" loading="lazy">`:'<div class="nop">Photo</div>'}<div class="t"><b>${e(p.Name)}</b><span class="mut">${e(p.Category||"—")}${p.is_active?"":" · Masqué"}</span> <span class="tg">${tagH(v)}</span></div><div class="stp"><button data-d="-1" aria-label="Moins">−</button><input type="number" inputmode="numeric" min="0" value="${v}"><button data-d="1" aria-label="Plus">+</button></div></div>`}).join(""):'<p class="mut">Aucun produit ici.</p>';
+    sync2();
+  };
+  const sync2=()=>{$("ssv").disabled=![...sedits].some(([id,v])=>{const p=list.find(x=>x.id==id);return p&&(+p.Stock||0)!==v})};
+  const setV=(row,v)=>{const id=+row.dataset.id,p=list.find(x=>x.id==id);if(!p)return;
+    if(v===(+p.Stock||0))sedits.delete(id);else sedits.set(id,v);
+    row.classList.toggle("chg",sedits.has(id));row.querySelector(".tg").innerHTML=tagH(v);sync2()};
+  $("sf").onclick=ev=>{const f=ev.target.dataset.f;if(f){sf=f;draw()}};
+  $("sl").onclick=ev=>{const b=ev.target.closest("[data-d]");if(!b)return;const row=b.closest(".srow"),inp=row.querySelector("input");
+    const v=Math.max(0,(parseInt(inp.value,10)||0)+(+b.dataset.d));inp.value=v;setV(row,v)};
+  $("sl").oninput=ev=>{if(ev.target.tagName!="INPUT")return;const v=parseInt(ev.target.value,10);if(isNaN(v)||v<0)return;setV(ev.target.closest(".srow"),v)};
+  $("ssv").onclick=async()=>{
+    const todo=[...sedits].filter(([id,v])=>{const p=list.find(x=>x.id==id);return p&&(+p.Stock||0)!==v});if(!todo.length)return;
+    const b=$("ssv"),t=b.textContent;b.disabled=true;let i=0;
+    try{for(const [id,v] of todo){b.textContent="Enregistrement "+(++i)+"/"+todo.length+"…";
+        const r=await api("/rest/v1/products?id=eq."+id,{method:"PATCH",headers:{...JH,Prefer:"return=minimal"},body:JSON.stringify({Stock:v})});
+        if(!r.ok)throw new Error(await errText(r));const p=list.find(x=>x.id==id);if(p)p.Stock=v;sedits.delete(id)}
+      toast(todo.length+" stock"+(todo.length>1?"s":"")+" enregistré"+(todo.length>1?"s":"")+" ✓")}
+    catch(err){toast(err.message,true)}
+    b.textContent=t;draw();refreshBadge();
+  };
+  draw();
+}
 const SRCN={direct:"Direct ou inconnu",tiktok:"TikTok",instagram:"Instagram",whatsapp:"WhatsApp",partage:"Lien partagé par un client",facebook:"Facebook",google:"Google"};
 async function paneStats(){
   $("pane").innerHTML=`<div class="chips">${[7,30,90].map(d=>`<button class="chip${sdays==d?" on":""}" data-d="${d}">${d} jours</button>`).join("")}</div><div id="sb"><p class="mut">Chargement…</p></div>`;
@@ -513,6 +579,8 @@ async function paneSettings(){
   $("pane").innerHTML=`<div id="sm"></div>
   <label for="s_wa">Numéro WhatsApp de la boutique (avec l’indicatif, sans +)</label><input id="s_wa" inputmode="numeric" value="${e(o.wa)}" placeholder="243824871399">
   <label for="s_bn">Bannière d’annonce en haut du site (vide = aucune)</label><input id="s_bn" value="${e(o.banner)}" placeholder="Ex : Promo du week-end −20%">
+  <h2>Alerte de stock</h2>
+  <label for="s_low">Prévenir quand il reste ce nombre d’articles ou moins</label><input id="s_low" inputmode="numeric" value="${e(o.low_stock||LOW)}">
   <h2>Livraison</h2>
   <label for="s_fee">Frais de livraison (FC)</label><input id="s_fee" inputmode="numeric" value="${e(o.fee)}">
   <label for="s_delay">Délai de livraison</label><input id="s_delay" value="${e(o.delay)}" placeholder="24 à 48 h">
@@ -548,10 +616,11 @@ async function paneSettings(){
     if(!$("s_delay").value.trim())return say("Indique un délai de livraison.",true);
     const ig=$("s_ig").value.trim(),tk=$("s_tk").value.trim(),tm=$("s_tm").value.trim();
     if((ig&&!/^https?:\/\//i.test(ig))||(tk&&!/^https?:\/\//i.test(tk)))return say("Les liens Instagram et TikTok doivent commencer par https://",true);
+    const low=parseInt($("s_low").value,10);if(isNaN(low)||low<1)return say("L’alerte de stock doit être un nombre entier (par exemple 3).",true);
     const b=$("s_sv");b.disabled=true;b.textContent="Enregistrement…";
-    const rows=[{key:"instagram",value:ig},{key:"tiktok",value:tk},{key:"terms",value:tm===DEF_TERMS.trim()?"":tm},{key:"wa",value:wa},{key:"fee",value:String(fee)},{key:"delay",value:$("s_delay").value.trim()},{key:"fl",value:String(fl)},{key:"fl2",value:String(fl2)},{key:"pay_airtel",value:$("s_pa").value.trim()},{key:"pay_mpesa",value:$("s_pm").value.trim()},{key:"banner",value:$("s_bn").value.trim()}];
+    const rows=[{key:"low_stock",value:String(low)},{key:"instagram",value:ig},{key:"tiktok",value:tk},{key:"terms",value:tm===DEF_TERMS.trim()?"":tm},{key:"wa",value:wa},{key:"fee",value:String(fee)},{key:"delay",value:$("s_delay").value.trim()},{key:"fl",value:String(fl)},{key:"fl2",value:String(fl2)},{key:"pay_airtel",value:$("s_pa").value.trim()},{key:"pay_mpesa",value:$("s_pm").value.trim()},{key:"banner",value:$("s_bn").value.trim()}];
     try{const r=await api("/rest/v1/settings?on_conflict=key",{method:"POST",headers:{...JH,Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(rows)});
-      if(!r.ok)throw new Error(await errText(r));say("Réglages enregistrés. Le site est à jour.")}
+      if(!r.ok)throw new Error(await errText(r));LOW=low;say("Réglages enregistrés. Le site est à jour.");refreshBadge()}
     catch(err){say(err.message,true)}
     b.disabled=false;b.textContent="Enregistrer les réglages";
   };
