@@ -81,6 +81,7 @@ label{font-weight:600;font-size:14px}
 .stp{display:flex;align-items:center;gap:6px;flex:none}
 .stp button{width:36px;height:36px;border-radius:10px;border:0;background:var(--soft);color:var(--ink);font:600 20px Outfit,sans-serif;cursor:pointer}
 .stp input{width:58px;margin:0;text-align:center;padding:8px 4px}
+.pimg{width:100%;border-radius:14px;margin-top:10px;border:1px solid var(--line)}
 [hidden]{display:none!important}
 </style></head><body>
 <div class="wrap" id="app"></div>
@@ -319,6 +320,7 @@ async function paneProducts(){
   <p class="mut" id="dh" style="margin:0 0 4px"></p>
   <div id="ls"><p class="mut">Chargement…</p></div>
   <h2>Outils</h2><a class="ghost w" href="index.html" target="_blank">Voir le site ›</a>
+  <button class="ghost w" id="pop">Trier par popularité (30 jours)</button>
   <button class="ghost w" id="viv">Trier par couleurs vives (automatique)</button>
   <button class="ghost w" id="fdesc">Remplir les descriptions vides (brouillon)</button>
   <button class="ghost w" id="exp">Exporter les produits (CSV)</button>
@@ -326,6 +328,7 @@ async function paneProducts(){
   $("new").onclick=()=>{cur=blank();go("form")};
   $("exp").onclick=ev=>exportProducts(ev.target);
   $("viv").onclick=ev=>autoVivid(ev.target);
+  $("pop").onclick=ev=>autoPop(ev.target);
   $("fdesc").onclick=ev=>fillDescs(ev.target);
   const dh=()=>{$("dh").textContent=(q.trim()||pf!="all"||pcat)?"Efface la recherche et les filtres pour pouvoir déplacer les produits.":"Glisse ≡ pour changer l’ordre : le premier produit apparaît en premier sur le site."};
   const drawF=()=>{$("pf").innerHTML=[["all","Tous"],["low","Stock bas"],["out","Épuisés"],["hidden","Masqués"]].map(([k,l])=>`<button class="chip${pf==k?" on":""}" data-f="${k}">${l}</button>`).join("")};
@@ -383,7 +386,7 @@ function renderForm(){
   <button class="ghost w" data-a="addc">+ Ajouter une couleur</button>
   <label class="chk" style="margin-top:14px"><input type="checkbox" id="fa" ${p.is_active?"checked":""}>Visible sur le site</label>
   ${p.isNew?"":`<label class="chk"><input type="checkbox" id="fpin" ${p.pin?"checked":""}>Mettre en tête de la boutique</label>`}
-  ${p.isNew?"":`<h2>Lien à partager</h2><div class="mut">Ce lien ouvre une page propre du produit, avec son prix.</div><div class="row2" style="margin-top:8px"><button class="ghost" data-lk="">Copier le lien</button><button class="ghost" data-lk="tiktok">TikTok</button><button class="ghost" data-lk="instagram">Instagram</button><button class="ghost" data-lk="whatsapp">WhatsApp</button></div><a class="ghost w" href="${e(prodLink(p.id,""))}" target="_blank" rel="noopener">Voir la page du produit ›</a>`}
+  ${p.isNew?"":`<h2>Lien à partager</h2><div class="mut">Ce lien ouvre une page propre du produit, avec son prix.</div><div class="row2" style="margin-top:8px"><button class="ghost" data-lk="">Copier le lien</button><button class="ghost" data-lk="tiktok">TikTok</button><button class="ghost" data-lk="instagram">Instagram</button><button class="ghost" data-lk="whatsapp">WhatsApp</button></div><a class="ghost w" href="${e(prodLink(p.id,""))}" target="_blank" rel="noopener">Voir la page du produit ›</a><h2>Image à poster</h2><div class="mut">Une image rouge et blanche avec la photo, le nom et le prix, prête pour une story ou une publication.</div><div class="row2" style="margin-top:8px"><button class="ghost" data-pst="story">Story (vertical)</button><button class="ghost" data-pst="post">Publication (carré)</button></div><div id="pstr"></div>`}
   <button class="btn" id="sv">Enregistrer</button>${p.isNew?"":'<button class="ghost w" id="dp" style="margin-top:10px">Dupliquer ce produit</button><button class="danger" id="dl">Supprimer ce produit</button>'}`;
   $("bk").onclick=()=>{sync();tab="products";go("main")};
   $("sv").onclick=saveForm;
@@ -395,6 +398,8 @@ function renderForm(){
 app.addEventListener("click",async ev=>{
   const lk=ev.target.closest("[data-lk]");
   if(lk&&view=="form"&&cur&&!cur.isNew){await copyText(prodLink(cur.id,lk.dataset.lk));toast("Lien copié ✓");return}
+  const ps=ev.target.closest("[data-pst]");
+  if(ps&&view=="form"&&cur&&!cur.isNew){makePoster(ps.dataset.pst);return}
   const t=ev.target.closest("[data-a]");if(!t||view!="form")return;
   sync();const a=t.dataset.a,i=+t.dataset.i,ci=+t.dataset.ci;
   if(a=="rmi")cur.images.splice(i,1);
@@ -463,14 +468,17 @@ const waNum=p=>{let d=String(p||"").replace(/\D/g,"");if(d.startsWith("00"))d=d.
 function orderHtml(o){
   const its=(o.items||[]).map(i=>e(itemTxt(i))).join("<br>");
   const others=Object.keys(ST).filter(k=>k!=o.status);
+  const hrs=(Date.now()-new Date(o.created_at).getTime())/36e5,mm=/airtel|m-?pesa/i.test(o.pay_method||"");
+  const ageTag=(o.status=="nouvelle"&&hrs>=24)?` <span class="tag" style="background:#ffe3e3;color:var(--red)">⏰ En attente depuis ${hrs>=48?Math.floor(hrs/24)+" j":"24 h"}</span>`:"";
+  const rl=o.status=="nouvelle"?`<a class="ghost" style="background:var(--red);color:#fff;text-decoration:none" href="${e("https://wa.me/"+waNum(o.phone)+"?text="+encodeURIComponent(relMsg(o)))}" target="_blank" rel="noopener">${mm?"Relancer le paiement":"Confirmer avec le client"}</a>`:"";
   const wa="https://wa.me/"+waNum(o.phone)+"?text="+encodeURIComponent("Bonjour "+(o.customer_name||"")+", ici JKSTORE au sujet de votre commande "+o.ref+".");
   return `<div class="oc" data-id="${o.id}"><div class="oh"><b>${e(o.ref)}</b><span class="tag s-${e(o.status)}">${e(ST[o.status]||o.status)}</span></div>
-  <div class="mut">${e(dfmt(o.created_at))}</div>
+  <div class="mut">${e(dfmt(o.created_at))}${ageTag}</div>
   <div style="margin-top:4px"><b>${e(o.customer_name)}</b> · <a href="tel:${e(o.phone)}">${e(o.phone)}</a></div>
   <div class="mut">${e([o.commune,o.quartier,o.address].filter(Boolean).join(", "))}${o.landmark?" ("+e(o.landmark)+")":""}</div>
   <div class="its">${its||"—"}</div>
   <div class="mut">Articles ${money(o.subtotal)} · Livraison ${fcf(o.delivery_fee)} · Paiement : ${e(o.pay_method||"—")}${o.promo_code?" · Code "+e(o.promo_code):""}</div>
-  <div class="ob">${others.map(k=>`<button class="ghost${k=="annulee"?" red":""}" data-s="${k}">${k=="nouvelle"?"Remettre à traiter":k=="payee"?"Marquer payée":k=="livree"?"Marquer livrée":"Annuler"}</button>`).join("")}<a class="ghost" href="${e(wa)}" target="_blank" rel="noopener" style="text-decoration:none">WhatsApp client</a>${o.status=="annulee"?'<button class="ghost red" data-del="1">Supprimer</button>':""}</div></div>`;
+  <div class="ob">${others.map(k=>`<button class="ghost${k=="annulee"?" red":""}" data-s="${k}">${k=="nouvelle"?"Remettre à traiter":k=="payee"?"Marquer payée":k=="livree"?"Marquer livrée":"Annuler"}</button>`).join("")}${rl}<a class="ghost" href="${e(wa)}" target="_blank" rel="noopener" style="text-decoration:none">WhatsApp client</a>${o.status=="annulee"?'<button class="ghost red" data-del="1">Supprimer</button>':""}</div></div>`;
 }
 let orders=[];
 async function paneOrders(){
@@ -483,6 +491,7 @@ async function paneOrders(){
     const a=orders.filter(o=>ofilter=="all"||o.status==ofilter);
     $("ol").innerHTML=a.length?a.map(orderHtml).join(""):'<p class="mut">Aucune commande ici pour l’instant.</p>';
   };
+  try{const rs=await api("/rest/v1/settings?select=key,value");if(rs.ok)(await rs.json()).forEach(x=>{if(x.key=="pay_airtel"&&x.value)PAYN.airtel=x.value;if(x.key=="pay_mpesa"&&x.value)PAYN.mpesa=x.value})}catch(_){}
   try{const r=await api("/rest/v1/orders?select=*&order=id.desc&limit=300");if(!r.ok)throw new Error(await errText(r));orders=await r.json();draw()}
   catch(err){$("ol").innerHTML=`<div class="msg err">${e(err.message)}</div>`;return}
   $("of").onclick=ev=>{const f=ev.target.dataset.f;if(f){ofilter=f;draw()}};
@@ -538,6 +547,89 @@ async function paneStocks(){
   };
   draw();
 }
+const PAYN={airtel:"0973034639",mpesa:"+243 824 871 399"};
+function relMsg(o){
+  const first=(o.customer_name||"").split(/\s+/)[0]||"",mm=/airtel|m-?pesa/i.test(o.pay_method||"");
+  if(mm){const num=/airtel/i.test(o.pay_method)?PAYN.airtel:PAYN.mpesa;
+    return `Bonjour ${first}, ici JKSTORE 😊\nVotre commande ${o.ref} (${money(o.subtotal)} + livraison ${fcf(o.delivery_fee)}) est en attente de paiement par ${o.pay_method}.\nVous pouvez envoyer le paiement au ${num}, puis nous envoyer la preuve (capture ou référence) ici pour que nous préparions votre commande. Merci !`}
+  return `Bonjour ${first}, ici JKSTORE 😊\nNous confirmons votre commande ${o.ref} :\n${(o.items||[]).map(i=>"- "+itemTxt(i)).join("\n")}\nLivraison : ${[o.commune,o.quartier,o.address].filter(Boolean).join(", ")}.\nPouvez-vous nous confirmer que tout est bon pour la livraison ? Merci !`;
+}
+function funnelHtml(f){
+  if(!f||!(+f.visit))return"";
+  const steps=[["visit","Ont visité le site"],["product","Ont ouvert une fiche produit"],["cart","Ont ajouté un article au panier"],["cartview","Ont ouvert leur panier"],["send","Ont envoyé la commande"]],base=+f.visit;let prev=base;
+  return '<h2>Parcours d’achat</h2><div class="mut">Visiteurs différents à chaque étape.</div>'+steps.map(([k,l],i)=>{const n=+f[k]||0,pct=Math.round(n/base*100),drop=i&&prev?Math.round((1-n/prev)*100):0;
+    const h=`<div class="tp"><div style="display:flex;justify-content:space-between;gap:8px"><b>${l}</b><span class="mut">${n} · ${pct} %${i&&prev&&n<prev?" (−"+drop+" %)":""}</span></div><div class="bar"><i style="width:${Math.min(100,pct)}%"></i></div></div>`;prev=n||prev;return h}).join("")
+    +'<p class="mut">Les étapes « panier ouvert » et « commande envoyée » se remplissent depuis la dernière mise à jour du site.</p>';
+}
+const patchP=(id,o)=>api("/rest/v1/products?id=eq."+id,{method:"PATCH",headers:{...JH,Prefer:"return=minimal"},body:JSON.stringify(o)});
+async function autoPop(btn){
+  if(!confirm("Classer les produits selon leur succès des 30 derniers jours (commandes, paniers, vues) ? Les plus populaires passent devant. Tu pourras ensuite ajuster en glissant."))return;
+  const t=btn.textContent;btn.disabled=true;btn.textContent="Calcul…";
+  try{
+    const r=await api("/rest/v1/rpc/admin_product_stats",{method:"POST",headers:JH,body:JSON.stringify({p_days:30})});
+    if(!r.ok)throw new Error(await errText(r));
+    const m=new Map((await r.json()).map(x=>[x.name,(+x.sold||0)*10+(+x.carts||0)*3+(+x.views||0)]));
+    const sc=list.map(p=>m.get(p.Name)||0);
+    if(!sc.some(x=>x>0))throw new Error("Pas encore assez de données (vues, paniers ou commandes).");
+    const idx=list.map((_,i)=>i).sort((a,b)=>(sc[b]-sc[a])||(a-b));
+    if(!await saveOrder(idx.map(i=>list[i].id)))throw new Error("L’ordre n’a pas pu être enregistré.");
+    const top=idx.filter(i=>sc[i]>0&&list[i].is_active).slice(0,3).map(i=>list[i]);
+    if(top.length&&confirm("Mettre le badge « Best-seller » sur les premiers : "+top.map(p=>p.Name).join(", ")+" ?")){
+      const ids=new Set(top.map(p=>p.id));
+      for(const p of list){const has=/best/i.test(p.badge||"");
+        if(ids.has(p.id)&&!(p.badge||"").trim())await patchP(p.id,{badge:"Best-seller"});
+        else if(!ids.has(p.id)&&has)await patchP(p.id,{badge:""})}
+    }
+    await loadList();$("ls").innerHTML=listHtml();
+  }catch(err){alert(err.message)}
+  btn.textContent=t;btn.disabled=false;
+}
+const sizesLine=p=>{const sh=/chauss|basket|crocs|sneaker|air force|puma|asics/i.test(p.Category||"");let a=csz(p.sizes);if(!a.length)a=sh?["38","39","40","41","42","43","44","45"]:["S","M","L","XL","XXL"];const j=a.join(",");
+  return a.length===1&&/^unique$/i.test(a[0])?"Taille unique":j==="S,M,L,XL,XXL"?"Tailles : S à XXL":j==="38,39,40,41,42,43,44,45"?"Pointures : 38 à 45":(/^\d+$/.test(a[0])?"Pointures : ":"Tailles : ")+a.join(", ")};
+function wrapLines(g,text,maxW,maxLines){const words=String(text).split(/\s+/);let line="",out=[];for(const w of words){const t=line?line+" "+w:w;if(g.measureText(t).width>maxW&&line){out.push(line);line=w}else line=t}if(line)out.push(line);
+  if(out.length>maxLines){out=out.slice(0,maxLines);out[maxLines-1]=out[maxLines-1].replace(/\s*\S*$/,"")+"…"}return out}
+function rrect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+async function makePoster(kind){
+  sync();const p=cur,url=p.images[0]||(p.colors.find(c=>c.images[0])||{images:[]}).images[0]||"",box=$("pstr");
+  if(!url){toast("Ajoute d’abord une photo au produit",true);return}
+  box.innerHTML='<p class="mut">Création de l’image…</p>';
+  try{
+    try{await document.fonts.load("700 80px Outfit");await document.fonts.load("500 40px Outfit")}catch(_){}
+    const img=await new Promise((res,rej)=>{const i=new Image();i.crossOrigin="anonymous";i.onload=()=>res(i);i.onerror=()=>rej(new Error("Impossible de lire la photo pour créer l’image."));i.src=url});
+    const st=kind=="story",W=1080,H=st?1920:1080,c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");
+    const RED="#FD1E23",INK="#1d1d1f",MUT="#6b6b70",F="Outfit,'DM Sans',system-ui,sans-serif";
+    const price=num(p.Price)||0,op=num(p.old_price)||0,pct=op>price&&price>0?Math.round((1-price/op)*100):0;
+    g.fillStyle="#fff";g.fillRect(0,0,W,H);
+    const topH=st?240:150,botH=st?300:170;
+    g.fillStyle=RED;g.fillRect(0,0,W,topH);
+    g.fillStyle="#fff";g.textBaseline="middle";g.textAlign="left";g.font="700 "+(st?100:74)+"px "+F;g.fillText("JKSTORE",60,topH/2);
+    g.textAlign="right";g.font="500 "+(st?36:28)+"px "+F;g.fillText("Livraison à Kinshasa",W-60,topH/2);
+    // photo
+    const px=60,py=topH+40,pw=st?W-120:520,ph=st?H-topH-botH-640:H-topH-botH-80;
+    g.save();rrect(g,px,py,pw,ph,36);g.clip();g.fillStyle="#fff";g.fillRect(px,py,pw,ph);const k=Math.min(pw/img.width,ph/img.height),iw=img.width*k,ih=img.height*k;g.drawImage(img,px+(pw-iw)/2,py+(ph-ih)/2,iw,ih);g.restore();
+    g.lineWidth=4;g.strokeStyle="#ececee";rrect(g,px,py,pw,ph,36);g.stroke();
+    const bt=pct?"−"+pct+"%":(p.badge||"").trim();
+    if(bt){g.font="700 "+(st?46:38)+"px "+F;const bw=g.measureText(bt).width+60,bh=st?84:70;g.fillStyle=RED;rrect(g,px+24,py+24,bw,bh,bh/2);g.fill();g.fillStyle="#fff";g.textAlign="left";g.textBaseline="middle";g.fillText(bt,px+54,py+24+bh/2+2)}
+    // texte
+    g.textBaseline="alphabetic";g.textAlign="left";
+    const tx=st?60:620,tw=st?W-120:400;let ty=st?py+ph+110:py+70;
+    g.fillStyle=INK;g.font="700 "+(st?76:54)+"px "+F;const lines=wrapLines(g,p.Name,tw,st?2:5),lh=st?88:64;lines.forEach((l,i)=>g.fillText(l,tx,ty+i*lh));ty+=lines.length*lh+(st?30:20);
+    g.fillStyle=RED;g.font="700 "+(st?150:100)+"px "+F;const ps=price.toFixed(2).replace(".",",")+" $";g.fillText(ps,tx,ty+(st?110:70));
+    if(op>price){const w1=g.measureText(ps).width;g.fillStyle=MUT;g.font="500 "+(st?60:40)+"px "+F;const os=op.toFixed(2).replace(".",",")+" $";const ox=st?tx+w1+30:tx,oy=st?ty+110:ty+130;g.fillText(os,ox,oy);const ow=g.measureText(os).width;g.fillRect(ox,oy-(st?20:13),ow,5)}
+    g.fillStyle=MUT;g.font="500 "+(st?42:32)+"px "+F;g.fillText(sizesLine(p),tx,st?ty+210:ty+(op>price?205:150));
+    // bandeau bas
+    g.fillStyle=RED;g.fillRect(0,H-botH,W,botH);g.fillStyle="#fff";g.textAlign="center";g.textBaseline="middle";
+    g.font="700 "+(st?64:48)+"px "+F;g.fillText("Commande sur WhatsApp",W/2,H-botH+(st?100:62));
+    g.font="500 "+(st?40:32)+"px "+F;g.fillText("jkstore-cd.github.io/jkstore",W/2,H-botH+(st?180:112));
+    if(st){g.font="600 40px "+F;g.fillText("@jkstore.cd",W/2,H-botH+245)}
+    const blob=await new Promise((res,rej)=>{try{c.toBlob(b=>b?res(b):rej(new Error("Image non créée")),"image/png")}catch(err){rej(new Error("Impossible de créer l’image à partir de cette photo."))}});
+    const u=URL.createObjectURL(blob),fname="jkstore-"+(p.Name||"produit").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")+"-"+kind+".png";
+    box.innerHTML=`<img class="pimg" src="${u}" alt="Image à poster"><button class="btn" id="pshare" style="margin-top:10px">Partager / Enregistrer l’image</button><div class="mut" style="margin-top:6px">Sinon, appuie longuement sur l’image puis « Enregistrer dans Photos ».</div>`;
+    $("pshare").onclick=async()=>{const f=new File([blob],fname,{type:"image/png"});
+      try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:p.Name});return}}catch(_){}
+      const a=document.createElement("a");a.href=u;a.download=fname;document.body.appendChild(a);a.click();a.remove()};
+  }catch(err){box.innerHTML="";toast(err.message,true)}
+}
 const SRCN={direct:"Direct ou inconnu",tiktok:"TikTok",instagram:"Instagram",whatsapp:"WhatsApp",partage:"Lien partagé par un client",facebook:"Facebook",google:"Google"};
 async function paneStats(){
   $("pane").innerHTML=`<div class="chips">${[7,30,90].map(d=>`<button class="chip${sdays==d?" on":""}" data-d="${d}">${d} jours</button>`).join("")}</div><div id="sb"><p class="mut">Chargement…</p></div>`;
@@ -545,6 +637,7 @@ async function paneStats(){
   try{
     const r=await api("/rest/v1/rpc/admin_stats",{method:"POST",headers:JH,body:JSON.stringify({p_days:sdays})});
     if(!r.ok)throw new Error(await errText(r));
+    let fu=null;try{const rf=await api("/rest/v1/rpc/admin_funnel",{method:"POST",headers:JH,body:JSON.stringify({p_days:sdays})});if(rf.ok)fu=await rf.json()}catch(_){}
     const s=await r.json(),days=s.days||[],mx=Math.max(1,...days.map(d=>d.visits)),top=s.top||[],tmx=Math.max(1,...top.map(t=>t.views));
     $("sb").innerHTML=`<div class="cards">
     <div class="card"><b>${s.visits}</b><span class="mut">Visites</span></div>
@@ -555,6 +648,7 @@ async function paneStats(){
     <div class="card"><b>${money(s.revenue)}</b><span class="mut">Ventes (articles)</span></div></div>
     <h2>D’où viennent les visites</h2>
     ${(s.sources||[]).length?(s.sources||[]).map(x=>`<div class="tp"><div style="display:flex;justify-content:space-between;gap:8px"><b>${e(SRCN[x.src]||x.src)}</b><span class="mut">${x.visits} visites · ${x.orders} commande${x.orders>1?"s":""}</span></div><div class="bar"><i style="width:${Math.round(x.visits/Math.max(1,...(s.sources||[]).map(y=>y.visits))*100)}%"></i></div></div>`).join(""):'<p class="mut">Pas encore de données. Utilise les liens de l’onglet Réglages dans tes bios.</p>'}
+    ${funnelHtml(fu)}
     <h2>Visites par jour</h2>
     <div class="bars">${days.map(d=>`<i title="${e(d.d)} : ${d.visits}" style="height:${Math.max(2,Math.round(d.visits/mx*100))}%"></i>`).join("")}</div>
     <div class="mut" style="display:flex;justify-content:space-between"><span>${e(days.length?days[0].d:"")}</span><span>max ${mx}/jour</span><span>${e(days.length?days[days.length-1].d:"")}</span></div>
